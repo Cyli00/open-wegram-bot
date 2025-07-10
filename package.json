@@ -1,14 +1,21 @@
 {
-  "name": "open-wegram-bot",
-  "version": "0.2.4",
+  "name": "crypto-indicator-bot",
+  "version": "1.0.0",
   "type": "module",
-  "description": "A two-way private messaging Telegram bot using Cloudflare Workers or Vercel",
+  "description": "A Telegram bot for cryptocurrency technical indicators using Cloudflare Workers or standalone server",
   "main": "src/worker.js",
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "node standalone-server.js",
+    "test": "node test.js"
   },
-  "author": "wozulong",
+  "keywords": ["cryptocurrency", "bitcoin", "ethereum", "RSI", "EMA", "telegram", "bot", "cloudflare-workers"],
+  "author": "based on wozulong/open-wegram-bot",
   "license": "GPL-3.0",
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
   "devDependencies": {
     "vercel": "^41.4.1",
     "wrangler": "^4.0.0"
