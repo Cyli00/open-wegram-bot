@@ -4,7 +4,7 @@
  */
 
 import { config } from './config.js';
-import { postToTelegramApi } from './core.js';
+import { postToTelegramApi } from './src/core.js';
 
 export class MessageService {
     constructor() {
