@@ -128,19 +128,10 @@ export class MessageService {
     }
 
     /**
-     * 格式化恐惧贪婪指数消息
+     * 格式化恐惧贪婪指数消息（支持多数据源）
      * @param {Object} fearGreedData - 恐惧贪婪指数数据
      */
     formatFearGreedMessage(fearGreedData) {
-        const value = parseInt(fearGreedData.value);
-        const classification = fearGreedData.value_classification;
-        
-        // 获取情绪指示器
-        const emotionIndicator = this.getEmotionIndicator(value);
-        
-        // 获取建议
-        const suggestion = this.getFearGreedSuggestion(value);
-        
         const timestamp = new Date().toLocaleString('zh-CN', {
             timeZone: 'Asia/Shanghai',
             year: 'numeric',
@@ -150,18 +141,73 @@ export class MessageService {
             minute: '2-digit'
         });
 
-        return `😰 *恐惧贪婪指数报告*\n\n` +
-               `📅 ${timestamp}\n\n` +
-               `📊 当前指数: ${value}/100\n` +
-               `🎯 市场情绪: ${emotionIndicator} ${classification}\n\n` +
-               `💡 *指数解读*\n` +
-               `${suggestion}\n\n` +
-               `📈 *指数范围*\n` +
-               `0-24: 极度恐惧 😱\n` +
-               `25-49: 恐惧 😟\n` +
-               `50-74: 贪婪 😊\n` +
-               `75-100: 极度贪婪 🤑\n\n` +
-               `📍 数据来源: Alternative.me`;
+        let message = `😰 *恐惧贪婪指数报告*\n\n📅 ${timestamp}\n\n`;
+
+        // 如果是综合数据
+        if (fearGreedData.alternative || fearGreedData.coinmarketcap) {
+            message += `📊 *多数据源对比*\n`;
+            
+            // Alternative.me数据
+            if (fearGreedData.alternative) {
+                const altValue = fearGreedData.alternative.value;
+                const altIndicator = this.getEmotionIndicator(altValue);
+                message += `🔸 Alternative.me: ${altValue}/100 ${altIndicator} (${fearGreedData.alternative.classification})\n`;
+            }
+            
+            // CoinMarketCap数据
+            if (fearGreedData.coinmarketcap) {
+                const cmcValue = fearGreedData.coinmarketcap.value;
+                const cmcIndicator = this.getEmotionIndicator(cmcValue);
+                message += `🔸 CoinMarketCap: ${cmcValue}/100 ${cmcIndicator} (${fearGreedData.coinmarketcap.classification})\n`;
+            }
+            
+            // 平均值
+            if (fearGreedData.average) {
+                const avgValue = fearGreedData.average.value;
+                const avgIndicator = this.getEmotionIndicator(avgValue);
+                message += `🎯 综合平均值: ${avgValue}/100 ${avgIndicator} (${fearGreedData.average.classification})\n\n`;
+            } else {
+                message += '\n';
+            }
+            
+            // 使用平均值或可用数据给出建议
+            const suggestionValue = fearGreedData.average?.value || 
+                                  fearGreedData.alternative?.value || 
+                                  fearGreedData.coinmarketcap?.value;
+            
+            if (suggestionValue) {
+                const suggestion = this.getFearGreedSuggestion(suggestionValue);
+                message += `💡 *综合解读*\n${suggestion}\n\n`;
+            }
+        } else {
+            // 兼容旧格式（单一数据源）
+            const value = parseInt(fearGreedData.value);
+            const classification = fearGreedData.value_classification;
+            const emotionIndicator = this.getEmotionIndicator(value);
+            const suggestion = this.getFearGreedSuggestion(value);
+            
+            message += `📊 当前指数: ${value}/100\n` +
+                      `🎯 市场情绪: ${emotionIndicator} ${classification}\n\n` +
+                      `💡 *指数解读*\n${suggestion}\n\n`;
+        }
+
+        message += `📈 *指数范围*\n` +
+                  `0-24: 极度恐惧 😱\n` +
+                  `25-49: 恐惧 😟\n` +
+                  `50-74: 贪婪 😊\n` +
+                  `75-100: 极度贪婪 🤑\n\n` +
+                  `📍 数据来源: `;
+        
+        // 添加数据源说明
+        if (fearGreedData.alternative && fearGreedData.coinmarketcap) {
+            message += `Alternative.me + CoinMarketCap`;
+        } else if (fearGreedData.alternative || fearGreedData.coinmarketcap) {
+            message += fearGreedData.alternative ? `Alternative.me` : `CoinMarketCap`;
+        } else {
+            message += `Alternative.me`;
+        }
+
+        return message;
     }
 
     /**
@@ -183,13 +229,16 @@ export class MessageService {
         // 综合分析
         const analysis = this.generateComprehensiveAnalysis(data);
 
+        // 获取恐惧贪婪指数显示值
+        const fearGreedDisplay = this.getFearGreedDisplayValue(fearGreedData);
+
         return `📊 *加密货币综合技术分析*\n\n` +
                `📅 ${timestamp}\n\n` +
                `🔍 *当前市场概况*\n` +
                `₿ BTC: $${btcEMA.currentPrice.toFixed(2)}\n` +
                `Ξ ETH: $${ethEMA.currentPrice.toFixed(2)}\n\n` +
                `😰 *市场情绪*\n` +
-               `恐惧贪婪指数: ${fearGreedData.value}/100 (${fearGreedData.value_classification})\n\n` +
+               `${fearGreedDisplay}\n\n` +
                `📈 *技术指标摘要*\n` +
                `${this.generateTechnicalSummary(btcRSI, ethRSI, btcEMA, ethEMA)}\n\n` +
                `🎯 *综合分析*\n` +
@@ -197,6 +246,25 @@ export class MessageService {
                `⚠️ *风险提示*\n` +
                `本报告仅供参考，不构成投资建议。\n` +
                `加密货币投资存在高风险，请谨慎决策。`;
+    }
+
+    /**
+     * 获取恐惧贪婪指数显示值
+     * @param {Object} fearGreedData - 恐惧贪婪指数数据
+     */
+    getFearGreedDisplayValue(fearGreedData) {
+        if (fearGreedData.average) {
+            return `综合指数: ${fearGreedData.average.value}/100 (${fearGreedData.average.classification})`;
+        } else if (fearGreedData.alternative) {
+            return `恐惧贪婪指数: ${fearGreedData.alternative.value}/100 (${fearGreedData.alternative.classification})`;
+        } else if (fearGreedData.coinmarketcap) {
+            return `恐惧贪婪指数: ${fearGreedData.coinmarketcap.value}/100 (${fearGreedData.coinmarketcap.classification})`;
+        } else {
+            // 兼容旧格式
+            const value = parseInt(fearGreedData.value || 50);
+            const classification = fearGreedData.value_classification || 'Neutral';
+            return `恐惧贪婪指数: ${value}/100 (${classification})`;
+        }
     }
 
     /**
@@ -231,7 +299,9 @@ export class MessageService {
      */
     generateComprehensiveAnalysis(data) {
         const { fearGreedData, btcRSI, ethRSI, btcEMA, ethEMA } = data;
-        const fearGreedValue = parseInt(fearGreedData.value);
+        
+        // 获取恐惧贪婪指数值
+        const fearGreedValue = this.getFearGreedValue(fearGreedData);
         
         let analysis = '';
         
@@ -254,6 +324,23 @@ export class MessageService {
         analysis += `\nΞ ETH趋势: ${ethTrend}`;
         
         return analysis;
+    }
+
+    /**
+     * 获取恐惧贪婪指数值
+     * @param {Object} fearGreedData - 恐惧贪婪指数数据
+     */
+    getFearGreedValue(fearGreedData) {
+        if (fearGreedData.average) {
+            return fearGreedData.average.value;
+        } else if (fearGreedData.alternative) {
+            return fearGreedData.alternative.value;
+        } else if (fearGreedData.coinmarketcap) {
+            return fearGreedData.coinmarketcap.value;
+        } else {
+            // 兼容旧格式
+            return parseInt(fearGreedData.value || 50);
+        }
     }
 
     /**

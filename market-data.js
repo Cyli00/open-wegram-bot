@@ -68,7 +68,7 @@ export class MarketDataService {
     }
 
     /**
-     * 获取恐惧贪婪指数
+     * 获取恐惧贪婪指数 (Alternative.me)
      */
     async getFearGreedIndex() {
         try {
@@ -81,9 +81,96 @@ export class MarketDataService {
             const data = await response.json();
             return data.data[0];
         } catch (error) {
-            console.error('Error fetching fear and greed index:', error);
+            console.error('Error fetching fear and greed index from Alternative.me:', error);
             throw error;
         }
+    }
+
+    /**
+     * 获取CoinMarketCap恐惧贪婪指数
+     */
+    async getCMCFearGreedIndex() {
+        try {
+            const response = await fetch(`${this.cmcBaseUrl}/fear-and-greed/historical?limit=1`, {
+                headers: {
+                    'X-CMC_PRO_API_KEY': this.cmcApiKey
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.data[0];
+        } catch (error) {
+            console.error('Error fetching fear and greed index from CoinMarketCap:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 获取综合恐惧贪婪指数，结合两个数据源
+     */
+    async getComprehensiveFearGreedIndex() {
+        try {
+            const results = {
+                alternative: null,
+                coinmarketcap: null,
+                average: null,
+                timestamp: new Date().toISOString()
+            };
+
+            // 并行获取两个数据源的数据
+            const [altData, cmcData] = await Promise.allSettled([
+                this.getFearGreedIndex(),
+                this.getCMCFearGreedIndex()
+            ]);
+
+            // 处理Alternative.me数据
+            if (altData.status === 'fulfilled' && altData.value) {
+                results.alternative = {
+                    value: parseInt(altData.value.value),
+                    classification: altData.value.value_classification,
+                    timestamp: altData.value.timestamp
+                };
+            }
+
+            // 处理CoinMarketCap数据
+            if (cmcData.status === 'fulfilled' && cmcData.value) {
+                results.coinmarketcap = {
+                    value: parseInt(cmcData.value.value),
+                    classification: cmcData.value.value_classification,
+                    timestamp: cmcData.value.timestamp
+                };
+            }
+
+            // 计算平均值（如果两个数据源都可用）
+            if (results.alternative && results.coinmarketcap) {
+                const avgValue = Math.round((results.alternative.value + results.coinmarketcap.value) / 2);
+                results.average = {
+                    value: avgValue,
+                    classification: this.classifyFearGreedValue(avgValue)
+                };
+            }
+
+            return results;
+        } catch (error) {
+            console.error('Error fetching comprehensive fear and greed index:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 根据数值分类恐惧贪婪指数
+     * @param {number} value - 恐惧贪婪指数值 (0-100)
+     */
+    classifyFearGreedValue(value) {
+        if (value <= 20) return 'Extreme Fear';
+        if (value <= 40) return 'Fear';
+        if (value <= 60) return 'Neutral';
+        if (value <= 80) return 'Greed';
+        return 'Extreme Greed';
     }
 
     /**

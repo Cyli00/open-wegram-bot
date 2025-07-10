@@ -115,7 +115,7 @@ export class SchedulerService {
         try {
             console.log('Executing fear and greed task...');
             
-            const fearGreedData = await this.marketData.getFearGreedIndex();
+            const fearGreedData = await this.marketData.getComprehensiveFearGreedIndex();
             
             const message = this.messageService.formatFearGreedMessage(fearGreedData);
             await this.messageService.sendMessage(message);
@@ -138,7 +138,7 @@ export class SchedulerService {
             const ethRSI = await this.marketData.getMultiTimeframeRSI('ethereum');
             const btcEMA = await this.marketData.getEMADistances('bitcoin');
             const ethEMA = await this.marketData.getEMADistances('ethereum');
-            const fearGreedData = await this.marketData.getFearGreedIndex();
+            const fearGreedData = await this.marketData.getComprehensiveFearGreedIndex();
             
             const message = this.messageService.formatComprehensiveMessage({
                 btcRSI,
