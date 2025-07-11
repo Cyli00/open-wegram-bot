@@ -186,7 +186,7 @@ export class SchedulerService {
         return {
             isRunning: this.isRunning,
             activeIntervals: Array.from(this.intervals.keys()),
-            config: config.scheduler
+            config: this.config.scheduler
         };
     }
 }
