@@ -5,23 +5,16 @@
 
 export function createConfig(env = {}) {
     return {
-        // Telegram Bot Configuration
-        telegram: {
-            token: env.TELEGRAM_BOT_TOKEN || '',
-            chatId: env.TELEGRAM_CHAT_ID || '',
-            secretToken: env.SECRET_TOKEN || ''
-        },
-
         // CoinMarketCap API Configuration
         coinmarketcap: {
             apiKey: env.COINMARKETCAP_API_KEY || '',
             baseUrl: 'https://pro-api.coinmarketcap.com/v1'
         },
 
-    // Alternative.me API Configuration
-    alternative: {
-        baseUrl: 'https://api.alternative.me/fng'
-    },
+        // Alternative.me API Configuration
+        alternative: {
+            baseUrl: 'https://api.alternative.me/fng'
+        },
 
     // Cryptocurrency symbols
     symbols: {

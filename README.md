@@ -23,6 +23,12 @@
 - 12 小时线
 - 日线
 
+### 📨 双向私聊功能（基于 open-wegram-bot）
+- **消息转发**: 将用户消息转发给机器人所有者
+- **回复功能**: 机器人所有者可以直接回复用户消息
+- **用户识别**: 显示发送者的用户名和 ID
+- **安全验证**: 使用 SECRET_TOKEN 确保消息安全
+
 ## 部署方式
 
 ### 方式 1: Cloudflare Workers (推荐)
@@ -37,7 +43,7 @@
 1. **克隆项目并安装依赖**
 ```bash
 git clone <your-repo-url>
-cd open-wegram-bot
+cd crypto-indicator-bot
 npm install
 ```
 
@@ -71,14 +77,10 @@ npx wrangler login
 
 2. **配置环境变量**
 ```bash
-# 设置生产环境变量
-npx wrangler secret put COINMARKETCAP_API_KEY
-npx wrangler secret put TELEGRAM_BOT_TOKEN  
-npx wrangler secret put TELEGRAM_CHAT_ID
-npx wrangler secret put SECRET_TOKEN
-
-# 设置可选环境变量
-npx wrangler secret put PREFIX              # 默认: public
+# 设置必需环境变量
+npx wrangler secret put PREFIX              # 推荐值: public
+npx wrangler secret put SECRET_TOKEN       # 至少16字符，包含大小写字母和数字
+npx wrangler secret put COINMARKETCAP_API_KEY # CoinMarketCap API密钥
 npx wrangler secret put ENABLE_SCHEDULER    # 设置为 true 启用定时任务
 ```
 
@@ -114,11 +116,9 @@ npm run deploy
    
    **生产环境变量 (Production)**:
    ```
-   COINMARKETCAP_API_KEY=your_api_key_here
-   TELEGRAM_BOT_TOKEN=your_bot_token_here  
-   TELEGRAM_CHAT_ID=your_chat_id_here
-   SECRET_TOKEN=your_secret_token_here
    PREFIX=public
+   SECRET_TOKEN=your_secret_token_here
+   COINMARKETCAP_API_KEY=your_api_key_here
    ENABLE_SCHEDULER=true
    ```
 
@@ -252,43 +252,54 @@ npm start
 - `POST /{prefix}/webhook/{owner_uid}/{bot_token}` - 处理 webhook
 - `GET /{prefix}/uninstall/{bot_token}` - 卸载 webhook
 
-### 新增指标功能
-- `GET /{prefix}/indicator/rsi` - 手动触发 RSI 指标推送
-- `GET /{prefix}/indicator/price` - 手动触发价格分析推送
-- `GET /{prefix}/indicator/feargreed` - 手动触发恐惧贪婪指数推送
-- `GET /{prefix}/indicator/comprehensive` - 手动触发综合分析推送
+### 新增指标功能（需要 bot_token 和 chat_id 参数）
+- `GET /{prefix}/indicator/rsi?bot_token=xxx&chat_id=xxx` - 手动触发 RSI 指标推送
+- `GET /{prefix}/indicator/price?bot_token=xxx&chat_id=xxx` - 手动触发价格分析推送
+- `GET /{prefix}/indicator/feargreed?bot_token=xxx&chat_id=xxx` - 手动触发恐惧贪婪指数推送
+- `GET /{prefix}/indicator/comprehensive?bot_token=xxx&chat_id=xxx` - 手动触发综合分析推送
 - `GET /{prefix}/indicator/status` - 查看调度器状态
 - `GET /{prefix}/indicator/start` - 启动调度器
 - `GET /{prefix}/indicator/stop` - 停止调度器
+
+## 使用流程
+
+### 1. 部署机器人
+1. 按照上述步骤部署到 Cloudflare Workers
+2. 设置必需的环境变量：`PREFIX`, `SECRET_TOKEN`, `COINMARKETCAP_API_KEY`, `ENABLE_SCHEDULER`
+
+### 2. 注册机器人
+使用 open-wegram-bot 的标准流程：
+```bash
+# 安装 webhook（这将同时注册机器人用于指标推送）
+curl "https://your-worker.workers.dev/public/install/{your_uid}/{your_bot_token}"
+```
+
+### 3. 使用指标功能
+- **自动推送**: 启用 `ENABLE_SCHEDULER=true` 后，定时任务会自动推送指标
+- **手动推送**: 通过 API 端点手动触发，需要提供 `bot_token` 和 `chat_id` 参数
 
 ## 环境变量配置
 
 | 变量名 | 说明 | 必需 |
 |--------|------|------|
+| `PREFIX` | API 路径前缀 | 是 (推荐: public) |
+| `SECRET_TOKEN` | 用于验证的密钥 | 是 (至少16字符，包含大小写字母和数字) |
 | `COINMARKETCAP_API_KEY` | CoinMarketCap API 密钥 | 是 |
-| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token | 是 |
-| `TELEGRAM_CHAT_ID` | 接收消息的聊天 ID | 是 |
-| `SECRET_TOKEN` | 用于验证的密钥 | 是 |
-| `PREFIX` | API 路径前缀 | 否 (默认: public) |
-| `ENABLE_SCHEDULER` | 是否启用定时任务 | 否 (默认: false) |
+| `ENABLE_SCHEDULER` | 是否启用定时任务 | 是 (设置为 true) |
 
 ## 获取所需的 API 密钥
 
-### 1. CoinMarketCap API 密钥
+### CoinMarketCap API 密钥
 1. 访问 [CoinMarketCap API](https://coinmarketcap.com/api/)
 2. 注册账户并获取 API 密钥
 3. 免费计划每月有 10,000 次调用限制
 
-### 2. Telegram Bot Token
+### Telegram Bot 设置
+按照 [open-wegram-bot 文档](https://github.com/wozulong/open-wegram-bot) 的说明：
 1. 在 Telegram 中找到 @BotFather
 2. 发送 `/newbot` 创建新机器人
 3. 按照指示获取 Bot Token
-
-### 3. Telegram Chat ID
-1. 将机器人添加到要接收消息的聊天中
-2. 发送一条消息给机器人
-3. 访问 `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-4. 在返回的 JSON 中找到 `chat.id`
+4. 通过 `/{prefix}/install/{owner_uid}/{bot_token}` 注册机器人
 
 ## 消息格式示例
 

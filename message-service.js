@@ -8,18 +8,18 @@ import { postToTelegramApi } from './src/core.js';
 export class MessageService {
     constructor(config) {
         this.config = config;
-        this.botToken = config.telegram.token;
-        this.chatId = config.telegram.chatId;
     }
 
     /**
      * 发送消息到Telegram
      * @param {string} message - 消息内容
+     * @param {string} botToken - 机器人Token
+     * @param {string} chatId - 聊天ID
      */
-    async sendMessage(message) {
+    async sendMessage(message, botToken, chatId) {
         try {
-            const response = await postToTelegramApi(this.botToken, 'sendMessage', {
-                chat_id: this.chatId,
+            const response = await postToTelegramApi(botToken, 'sendMessage', {
+                chat_id: chatId,
                 text: message,
                 parse_mode: 'Markdown',
                 disable_web_page_preview: true

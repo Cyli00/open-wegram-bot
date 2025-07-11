@@ -10,9 +10,26 @@ export class SchedulerService {
     constructor(config) {
         this.config = config;
         this.marketData = new MarketDataService(config);
-        this.messageService = new MessageService(config);
         this.intervals = new Map();
         this.isRunning = false;
+        // 注册的机器人映射 {ownerId: {botToken, chatId}}
+        this.registeredBots = new Map();
+    }
+
+    /**
+     * 注册机器人
+     */
+    registerBot(ownerId, botToken, chatId) {
+        this.registeredBots.set(ownerId, {botToken, chatId});
+        console.log(`Bot registered for owner ${ownerId}`);
+    }
+
+    /**
+     * 注销机器人
+     */
+    unregisterBot(ownerId) {
+        this.registeredBots.delete(ownerId);
+        console.log(`Bot unregistered for owner ${ownerId}`);
     }
 
     /**
@@ -71,22 +88,57 @@ export class SchedulerService {
     }
 
     /**
+     * 执行任务（用于手动触发）
+     */
+    async executeTask(taskType, botToken, chatId) {
+        const messageService = new MessageService(this.config);
+        
+        switch (taskType) {
+            case 'rsi':
+                await this.executeRSITaskForBot(messageService, botToken, chatId);
+                break;
+            case 'price':
+                await this.executePriceTaskForBot(messageService, botToken, chatId);
+                break;
+            case 'fearGreed':
+                await this.executeFearGreedTaskForBot(messageService, botToken, chatId);
+                break;
+            case 'comprehensive':
+                await this.executeComprehensiveTaskForBot(messageService, botToken, chatId);
+                break;
+            default:
+                throw new Error(`Unknown task type: ${taskType}`);
+        }
+    }
+
+    /**
      * 执行RSI指标任务
      */
     async executeRSITask() {
-        try {
-            console.log('Executing RSI task...');
-            
-            const btcRSI = await this.marketData.getMultiTimeframeRSI('bitcoin');
-            const ethRSI = await this.marketData.getMultiTimeframeRSI('ethereum');
-            
-            const message = this.messageService.formatRSIMessage(btcRSI, ethRSI);
-            await this.messageService.sendMessage(message);
-            
-            console.log('RSI task completed');
-        } catch (error) {
-            console.error('Error in RSI task:', error);
+        // 为所有注册的机器人执行任务
+        for (const [ownerId, {botToken, chatId}] of this.registeredBots) {
+            try {
+                const messageService = new MessageService(this.config);
+                await this.executeRSITaskForBot(messageService, botToken, chatId);
+            } catch (error) {
+                console.error(`Error in RSI task for owner ${ownerId}:`, error);
+            }
         }
+    }
+
+    /**
+     * 为特定机器人执行RSI任务
+     */
+    async executeRSITaskForBot(messageService, botToken, chatId) {
+        console.log('Executing RSI task...');
+        
+        const btcRSI = await this.marketData.getMultiTimeframeRSI('bitcoin');
+        const ethRSI = await this.marketData.getMultiTimeframeRSI('ethereum');
+        
+        const message = messageService.formatRSIMessage(btcRSI, ethRSI);
+        await messageService.sendMessage(message, botToken, chatId);
+        
+        console.log('RSI task completed');
     }
 
     /**

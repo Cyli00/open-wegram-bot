@@ -46,7 +46,7 @@ export class MarketDataService {
      */
     async getCurrentPrice(symbol) {
         try {
-            const coinId = config.coinIds[symbol.toLowerCase()] || config.coinIds.bitcoin;
+            const coinId = this.config.coinIds[symbol.toLowerCase()] || this.config.coinIds.bitcoin;
             
             const response = await fetch(`${this.cmcBaseUrl}/cryptocurrency/quotes/latest?id=${coinId}`, {
                 headers: {

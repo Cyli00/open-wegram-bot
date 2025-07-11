@@ -43,7 +43,7 @@ export default {
 /**
  * 处理指标相关请求
  */
-async function handleIndicatorRequest(_request, path, _prefix, env) {
+async function handleIndicatorRequest(request, path, _prefix, env) {
     const pathParts = path.split('/');
     const command = pathParts[pathParts.length - 1];
     
@@ -63,19 +63,34 @@ async function handleIndicatorRequest(_request, path, _prefix, env) {
         }
     }
 
+    // 从请求中获取 bot_token 和 chat_id（通过查询参数或头部）
+    const url = new URL(request.url);
+    const botToken = url.searchParams.get('bot_token') || request.headers.get('X-Bot-Token');
+    const chatId = url.searchParams.get('chat_id') || request.headers.get('X-Chat-Id');
+
+    if (!botToken || !chatId) {
+        return new Response(JSON.stringify({
+            success: false,
+            message: 'Missing bot_token or chat_id parameters'
+        }), {
+            status: 400,
+            headers: {'Content-Type': 'application/json'}
+        });
+    }
+
     try {
         switch (command) {
             case 'rsi':
-                await scheduler.executeTask('rsi');
+                await scheduler.executeTask('rsi', botToken, chatId);
                 break;
             case 'price':
-                await scheduler.executeTask('price');
+                await scheduler.executeTask('price', botToken, chatId);
                 break;
             case 'feargreed':
-                await scheduler.executeTask('fearGreed');
+                await scheduler.executeTask('fearGreed', botToken, chatId);
                 break;
             case 'comprehensive':
-                await scheduler.executeTask('comprehensive');
+                await scheduler.executeTask('comprehensive', botToken, chatId);
                 break;
             case 'status':
                 const status = scheduler.getStatus();
