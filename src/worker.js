@@ -43,19 +43,23 @@ export default {
 /**
  * 处理指标相关请求
  */
-async function handleIndicatorRequest(request, path, prefix, env) {
+async function handleIndicatorRequest(_request, path, _prefix, env) {
     const pathParts = path.split('/');
     const command = pathParts[pathParts.length - 1];
     
     // 如果调度器未初始化，检查是否可以初始化
     if (!scheduler) {
+        // 添加调试信息
+        console.log('ENABLE_SCHEDULER value:', env.ENABLE_SCHEDULER);
+        console.log('Available env keys:', Object.keys(env));
+        
         if (env.ENABLE_SCHEDULER === 'true') {
             // 临时创建调度器用于手动触发
             scheduler = new SchedulerService(createConfig(env));
         } else {
             return new Response(JSON.stringify({
                 success: false,
-                message: 'Scheduler not initialized. Set ENABLE_SCHEDULER=true'
+                message: `Scheduler not initialized. ENABLE_SCHEDULER=${env.ENABLE_SCHEDULER}. Available env: ${Object.keys(env).join(', ')}`
             }), {
                 status: 400,
                 headers: {'Content-Type': 'application/json'}
