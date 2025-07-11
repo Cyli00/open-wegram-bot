@@ -3,14 +3,14 @@
  * 定时任务管理系统
  */
 
-import { config } from './config.js';
 import { MarketDataService } from './market-data.js';
 import { MessageService } from './message-service.js';
 
 export class SchedulerService {
-    constructor() {
-        this.marketData = new MarketDataService();
-        this.messageService = new MessageService();
+    constructor(config) {
+        this.config = config;
+        this.marketData = new MarketDataService(config);
+        this.messageService = new MessageService(config);
         this.intervals = new Map();
         this.isRunning = false;
     }
@@ -30,22 +30,22 @@ export class SchedulerService {
         // RSI 指标任务 - 每15分钟
         this.intervals.set('rsi', setInterval(async () => {
             await this.executeRSITask();
-        }, config.scheduler.rsiInterval));
+        }, this.config.scheduler.rsiInterval));
 
         // 价格和EMA距离任务 - 每1小时
         this.intervals.set('price', setInterval(async () => {
             await this.executePriceTask();
-        }, config.scheduler.priceInterval));
+        }, this.config.scheduler.priceInterval));
 
         // 恐惧贪婪指数任务 - 每1小时
         this.intervals.set('fearGreed', setInterval(async () => {
             await this.executeFearGreedTask();
-        }, config.scheduler.fearGreedInterval));
+        }, this.config.scheduler.fearGreedInterval));
 
         // 综合报告任务 - 每1小时
         this.intervals.set('comprehensive', setInterval(async () => {
             await this.executeComprehensiveTask();
-        }, config.scheduler.priceInterval));
+        }, this.config.scheduler.priceInterval));
 
         console.log('All schedulers started successfully');
     }

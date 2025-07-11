@@ -3,11 +3,11 @@
  * 消息格式化和推送服务
  */
 
-import { config } from './config.js';
 import { postToTelegramApi } from './src/core.js';
 
 export class MessageService {
-    constructor() {
+    constructor(config) {
+        this.config = config;
         this.botToken = config.telegram.token;
         this.chatId = config.telegram.chatId;
     }

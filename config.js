@@ -3,19 +3,20 @@
  * 配置文件，包含所有必要的API密钥和设置
  */
 
-export const config = {
-    // Telegram Bot Configuration
-    telegram: {
-        token: process.env.TELEGRAM_BOT_TOKEN || '',
-        chatId: process.env.TELEGRAM_CHAT_ID || '',
-        secretToken: process.env.SECRET_TOKEN || ''
-    },
+export function createConfig(env = {}) {
+    return {
+        // Telegram Bot Configuration
+        telegram: {
+            token: env.TELEGRAM_BOT_TOKEN || '',
+            chatId: env.TELEGRAM_CHAT_ID || '',
+            secretToken: env.SECRET_TOKEN || ''
+        },
 
-    // CoinMarketCap API Configuration
-    coinmarketcap: {
-        apiKey: process.env.COINMARKETCAP_API_KEY || '',
-        baseUrl: 'https://pro-api.coinmarketcap.com/v1'
-    },
+        // CoinMarketCap API Configuration
+        coinmarketcap: {
+            apiKey: env.COINMARKETCAP_API_KEY || '',
+            baseUrl: 'https://pro-api.coinmarketcap.com/v1'
+        },
 
     // Alternative.me API Configuration
     alternative: {
@@ -50,10 +51,16 @@ export const config = {
         periods: [50, 100, 200]
     },
 
-    // Scheduler settings
-    scheduler: {
-        rsiInterval: 15 * 60 * 1000, // 15 minutes
-        priceInterval: 60 * 60 * 1000, // 1 hour
-        fearGreedInterval: 60 * 60 * 1000 // 1 hour
-    }
-};
+        // Scheduler settings
+        scheduler: {
+            rsiInterval: 15 * 60 * 1000, // 15 minutes
+            priceInterval: 60 * 60 * 1000, // 1 hour
+            fearGreedInterval: 60 * 60 * 1000 // 1 hour
+        }
+    };
+}
+
+// Fallback for environments where process.env is available (like Node.js)
+export const config = typeof process !== 'undefined' && process.env ? 
+    createConfig(process.env) : 
+    createConfig({});

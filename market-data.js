@@ -3,10 +3,9 @@
  * 负责获取加密货币市场数据和技术指标
  */
 
-import { config } from './config.js';
-
 export class MarketDataService {
-    constructor() {
+    constructor(config) {
+        this.config = config;
         this.cmcApiKey = config.coinmarketcap.apiKey;
         this.cmcBaseUrl = config.coinmarketcap.baseUrl;
         this.altBaseUrl = config.alternative.baseUrl;
@@ -21,7 +20,7 @@ export class MarketDataService {
     async getHistoricalData(symbol, interval, count = 100) {
         try {
             // 使用 CoinMarketCap API 获取历史数据
-            const coinId = config.coinIds[symbol.toLowerCase()] || config.coinIds.bitcoin;
+            const coinId = this.config.coinIds[symbol.toLowerCase()] || this.config.coinIds.bitcoin;
             
             const response = await fetch(`${this.cmcBaseUrl}/cryptocurrency/quotes/historical?id=${coinId}&count=${count}&interval=${interval}`, {
                 headers: {

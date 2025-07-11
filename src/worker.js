@@ -7,6 +7,7 @@
 
 import {handleRequest} from './core.js';
 import {SchedulerService} from '../scheduler.js';
+import {createConfig} from '../config.js';
 
 // 全局调度器实例
 let scheduler = null;
@@ -20,18 +21,8 @@ export default {
 
         // 初始化调度器（如果还没有创建）
         if (!scheduler && env.ENABLE_SCHEDULER === 'true') {
-            // 设置环境变量到配置中
-            if (env.COINMARKETCAP_API_KEY) {
-                process.env.COINMARKETCAP_API_KEY = env.COINMARKETCAP_API_KEY;
-            }
-            if (env.TELEGRAM_BOT_TOKEN) {
-                process.env.TELEGRAM_BOT_TOKEN = env.TELEGRAM_BOT_TOKEN;
-            }
-            if (env.TELEGRAM_CHAT_ID) {
-                process.env.TELEGRAM_CHAT_ID = env.TELEGRAM_CHAT_ID;
-            }
-            
-            scheduler = new SchedulerService();
+            // 使用传入的 env 创建配置
+            scheduler = new SchedulerService(createConfig(env));
             
             // 启动定时任务
             ctx.waitUntil(scheduler.start());
