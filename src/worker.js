@@ -33,7 +33,7 @@ export default {
         const path = url.pathname;
         
         if (path.startsWith(`/${config.prefix}/indicator/`)) {
-            return handleIndicatorRequest(request, path, config.prefix);
+            return handleIndicatorRequest(request, path, config.prefix, env);
         }
 
         return handleRequest(request, config);
@@ -43,18 +43,24 @@ export default {
 /**
  * 处理指标相关请求
  */
-async function handleIndicatorRequest(request, path, prefix) {
+async function handleIndicatorRequest(request, path, prefix, env) {
     const pathParts = path.split('/');
     const command = pathParts[pathParts.length - 1];
     
+    // 如果调度器未初始化，检查是否可以初始化
     if (!scheduler) {
-        return new Response(JSON.stringify({
-            success: false,
-            message: 'Scheduler not initialized. Set ENABLE_SCHEDULER=true'
-        }), {
-            status: 400,
-            headers: {'Content-Type': 'application/json'}
-        });
+        if (env.ENABLE_SCHEDULER === 'true') {
+            // 临时创建调度器用于手动触发
+            scheduler = new SchedulerService(createConfig(env));
+        } else {
+            return new Response(JSON.stringify({
+                success: false,
+                message: 'Scheduler not initialized. Set ENABLE_SCHEDULER=true'
+            }), {
+                status: 400,
+                headers: {'Content-Type': 'application/json'}
+            });
+        }
     }
 
     try {
