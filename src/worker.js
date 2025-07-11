@@ -14,10 +14,25 @@ let scheduler = null;
 
 export default {
     async fetch(request, env, ctx) {
+        // 调试：检查环境变量
+        console.log('Environment variables check:', {
+            PREFIX: env.PREFIX,
+            SECRET_TOKEN_LENGTH: env.SECRET_TOKEN?.length || 0,
+            HAS_SECRET_TOKEN: !!env.SECRET_TOKEN,
+            ENABLE_SCHEDULER: env.ENABLE_SCHEDULER,
+            COINMARKETCAP_API_KEY_LENGTH: env.COINMARKETCAP_API_KEY?.length || 0
+        });
+
         const config = {
             prefix: env.PREFIX || 'public',
             secretToken: env.SECRET_TOKEN || ''
         };
+
+        console.log('Config created:', {
+            prefix: config.prefix,
+            secretTokenLength: config.secretToken?.length || 0,
+            hasSecretToken: !!config.secretToken
+        });
 
         // 初始化调度器（如果还没有创建）
         if (!scheduler && env.ENABLE_SCHEDULER === 'true') {
