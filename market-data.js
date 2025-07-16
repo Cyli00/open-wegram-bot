@@ -8,7 +8,71 @@ export class MarketDataService {
         this.config = config;
         this.cmcApiKey = config.coinmarketcap.apiKey;
         this.cmcBaseUrl = config.coinmarketcap.baseUrl;
+        this.binanceBaseUrl = config.binance.baseUrl;
         this.altBaseUrl = config.alternative.baseUrl;
+    }
+
+    /**
+     * 从币安获取历史K线数据
+     * @param {string} symbol - 币种符号
+     * @param {string} interval - 时间间隔
+     * @param {number} limit - 数据点数量
+     */
+    async getBinanceHistoricalData(symbol, interval, limit = 100) {
+        try {
+            const pair = this.config.binancePairs[symbol.toLowerCase()] || 'BTCUSDT';
+            
+            // 币安时间间隔映射
+            const binanceInterval = this.mapToBinanceInterval(interval);
+            
+            const url = `${this.binanceBaseUrl}/klines?symbol=${pair}&interval=${binanceInterval}&limit=${limit}`;
+            
+            console.log(`Fetching Binance data: ${url}`);
+            
+            const response = await fetch(url);
+            
+            console.log(`Binance response status:`, response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(`Binance data length:`, data.length);
+            
+            // 转换币安数据格式为内部格式
+            const formattedData = data.map(kline => ({
+                timestamp: kline[0],
+                open: parseFloat(kline[1]),
+                high: parseFloat(kline[2]),
+                low: parseFloat(kline[3]),
+                close: parseFloat(kline[4]),
+                volume: parseFloat(kline[5])
+            }));
+            
+            console.log(`Formatted data sample:`, formattedData.slice(0, 3));
+            
+            return formattedData;
+        } catch (error) {
+            console.error(`Error fetching Binance data for ${symbol}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * 将时间间隔映射为币安格式
+     * @param {string} interval - 内部时间间隔格式
+     */
+    mapToBinanceInterval(interval) {
+        const intervalMap = {
+            '15m': '15m',
+            '1h': '1h',
+            '4h': '4h',
+            '8h': '8h',
+            '12h': '12h',
+            '1d': '1d'
+        };
+        return intervalMap[interval] || '1h';
     }
 
     /**
@@ -251,14 +315,13 @@ export class MarketDataService {
     async getMultiTimeframeRSI(symbol) {
         const results = {};
         
-        console.log(`Getting RSI for ${symbol}`);
+        console.log(`Getting RSI for ${symbol} using Binance API`);
         console.log(`Available intervals:`, this.config.intervals.rsi);
         
         for (const interval of this.config.intervals.rsi) {
             try {
-                console.log(`Fetching data for ${symbol} ${interval}`);
-                const historicalData = await this.getHistoricalData(symbol, interval, 50);
-                console.log(`Historical data length:`, historicalData.length);
+                console.log(`Fetching Binance data for ${symbol} ${interval}`);
+                const historicalData = await this.getBinanceHistoricalData(symbol, interval, 100);
                 
                 if (historicalData.length === 0) {
                     console.log(`No historical data for ${symbol} ${interval}`);
@@ -266,12 +329,15 @@ export class MarketDataService {
                     continue;
                 }
                 
-                const prices = historicalData.map(item => item.quote.USD.close);
-                console.log(`Prices sample:`, prices.slice(0, 5));
+                const prices = historicalData.map(item => item.close);
+                console.log(`Prices sample for ${symbol} ${interval}:`, prices.slice(0, 5));
+                
+                const rsi6 = this.calculateRSI(prices, 6);
+                const rsi14 = this.calculateRSI(prices, 14);
                 
                 results[interval] = {
-                    rsi6: this.calculateRSI(prices, 6),
-                    rsi14: this.calculateRSI(prices, 14)
+                    rsi6: rsi6,
+                    rsi14: rsi14
                 };
                 
                 console.log(`RSI results for ${symbol} ${interval}:`, results[interval]);
@@ -291,24 +357,28 @@ export class MarketDataService {
      */
     async getEMADistances(symbol) {
         try {
-            const currentPrice = await this.getCurrentPrice(symbol);
-            const price = currentPrice.quote.USD.price;
+            // 使用币安获取当前价格和历史数据
+            const historicalData = await this.getBinanceHistoricalData(symbol, '1h', 200);
             
-            const historicalData = await this.getHistoricalData(symbol, '1h', 200);
-            const prices = historicalData.map(item => item.quote.USD.close);
+            if (historicalData.length === 0) {
+                throw new Error(`No historical data for ${symbol}`);
+            }
+            
+            const prices = historicalData.map(item => item.close);
+            const currentPrice = prices[prices.length - 1]; // 最新价格
             
             const ema50 = this.calculateEMA(prices, 50);
             const ema100 = this.calculateEMA(prices, 100);
             const ema200 = this.calculateEMA(prices, 200);
             
             return {
-                currentPrice: price,
+                currentPrice: currentPrice,
                 ema50: ema50,
                 ema100: ema100,
                 ema200: ema200,
-                distanceToEMA50: ema50 ? ((price - ema50) / ema50 * 100).toFixed(2) : null,
-                distanceToEMA100: ema100 ? ((price - ema100) / ema100 * 100).toFixed(2) : null,
-                distanceToEMA200: ema200 ? ((price - ema200) / ema200 * 100).toFixed(2) : null
+                distanceToEMA50: ema50 ? ((currentPrice - ema50) / ema50 * 100).toFixed(2) : null,
+                distanceToEMA100: ema100 ? ((currentPrice - ema100) / ema100 * 100).toFixed(2) : null,
+                distanceToEMA200: ema200 ? ((currentPrice - ema200) / ema200 * 100).toFixed(2) : null
             };
         } catch (error) {
             console.error(`Error calculating EMA distances for ${symbol}:`, error);
