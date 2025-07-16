@@ -209,10 +209,10 @@ export class SchedulerService {
     }
 
     /**
-     * 手动执行任务
+     * 手动执行任务（自动调度用）
      * @param {string} taskName - 任务名称
      */
-    async executeTask(taskName) {
+    async executeTaskByName(taskName) {
         switch (taskName) {
             case 'rsi':
                 await this.executeRSITask();
