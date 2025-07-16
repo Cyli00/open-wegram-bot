@@ -142,6 +142,57 @@ export class SchedulerService {
     }
 
     /**
+     * 执行价格和EMA距离任务（用于手动触发）
+     */
+    async executePriceTaskForBot(messageService, botToken, chatId) {
+        console.log('Executing price task...');
+        
+        const btcEMA = await this.marketData.getEMADistances('bitcoin');
+        const ethEMA = await this.marketData.getEMADistances('ethereum');
+        
+        const message = messageService.formatPriceMessage(btcEMA, ethEMA);
+        await messageService.sendMessage(message, botToken, chatId);
+        
+        console.log('Price task completed');
+    }
+
+    /**
+     * 执行恐惧贪婪指数任务（用于手动触发）
+     */
+    async executeFearGreedTaskForBot(messageService, botToken, chatId) {
+        console.log('Executing fear greed task...');
+        
+        const altIndex = await this.marketData.getFearGreedIndex('alternative');
+        const cmcIndex = await this.marketData.getFearGreedIndex('coinmarketcap');
+        
+        const message = messageService.formatFearGreedMessage(altIndex, cmcIndex);
+        await messageService.sendMessage(message, botToken, chatId);
+        
+        console.log('Fear greed task completed');
+    }
+
+    /**
+     * 执行综合分析任务（用于手动触发）
+     */
+    async executeComprehensiveTaskForBot(messageService, botToken, chatId) {
+        console.log('Executing comprehensive task...');
+        
+        const btcRSI = await this.marketData.getMultiTimeframeRSI('bitcoin');
+        const ethRSI = await this.marketData.getMultiTimeframeRSI('ethereum');
+        const btcEMA = await this.marketData.getEMADistances('bitcoin');
+        const ethEMA = await this.marketData.getEMADistances('ethereum');
+        const altIndex = await this.marketData.getFearGreedIndex('alternative');
+        const cmcIndex = await this.marketData.getFearGreedIndex('coinmarketcap');
+        
+        const message = messageService.formatComprehensiveMessage(
+            btcRSI, ethRSI, btcEMA, ethEMA, altIndex, cmcIndex
+        );
+        await messageService.sendMessage(message, botToken, chatId);
+        
+        console.log('Comprehensive task completed');
+    }
+
+    /**
      * 执行价格和EMA距离任务
      */
     async executePriceTask() {

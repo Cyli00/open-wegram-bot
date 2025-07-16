@@ -21,18 +21,29 @@ export class MarketDataService {
         try {
             // 使用 CoinMarketCap API 获取历史数据
             const coinId = this.config.coinIds[symbol.toLowerCase()] || this.config.coinIds.bitcoin;
+            const url = `${this.cmcBaseUrl}/cryptocurrency/quotes/historical?id=${coinId}&count=${count}&interval=${interval}`;
             
-            const response = await fetch(`${this.cmcBaseUrl}/cryptocurrency/quotes/historical?id=${coinId}&count=${count}&interval=${interval}`, {
+            console.log(`Fetching historical data: ${url}`);
+            console.log(`API Key length:`, this.cmcApiKey?.length || 0);
+            
+            const response = await fetch(url, {
                 headers: {
                     'X-CMC_PRO_API_KEY': this.cmcApiKey
                 }
             });
 
+            console.log(`Response status:`, response.status);
+            
             if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`API Error Response:`, errorText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
+            console.log(`API Response structure:`, Object.keys(data));
+            console.log(`Data structure:`, data.data ? Object.keys(data.data) : 'No data field');
+            
             return data.data.quotes || [];
         } catch (error) {
             console.error(`Error fetching historical data for ${symbol}:`, error);
@@ -240,21 +251,37 @@ export class MarketDataService {
     async getMultiTimeframeRSI(symbol) {
         const results = {};
         
-        for (const interval of config.intervals.rsi) {
+        console.log(`Getting RSI for ${symbol}`);
+        console.log(`Available intervals:`, this.config.intervals.rsi);
+        
+        for (const interval of this.config.intervals.rsi) {
             try {
+                console.log(`Fetching data for ${symbol} ${interval}`);
                 const historicalData = await this.getHistoricalData(symbol, interval, 50);
+                console.log(`Historical data length:`, historicalData.length);
+                
+                if (historicalData.length === 0) {
+                    console.log(`No historical data for ${symbol} ${interval}`);
+                    results[interval] = { rsi6: null, rsi14: null };
+                    continue;
+                }
+                
                 const prices = historicalData.map(item => item.quote.USD.close);
+                console.log(`Prices sample:`, prices.slice(0, 5));
                 
                 results[interval] = {
                     rsi6: this.calculateRSI(prices, 6),
                     rsi14: this.calculateRSI(prices, 14)
                 };
+                
+                console.log(`RSI results for ${symbol} ${interval}:`, results[interval]);
             } catch (error) {
                 console.error(`Error calculating RSI for ${symbol} ${interval}:`, error);
                 results[interval] = { rsi6: null, rsi14: null };
             }
         }
 
+        console.log(`Final RSI results for ${symbol}:`, results);
         return results;
     }
 
