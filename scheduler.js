@@ -162,10 +162,9 @@ export class SchedulerService {
     async executeFearGreedTaskForBot(messageService, botToken, chatId) {
         console.log('Executing fear greed task...');
         
-        const altIndex = await this.marketData.getFearGreedIndex('alternative');
-        const cmcIndex = await this.marketData.getFearGreedIndex('coinmarketcap');
+        const comprehensiveIndex = await this.marketData.getComprehensiveFearGreedIndex();
         
-        const message = messageService.formatFearGreedMessage(altIndex, cmcIndex);
+        const message = messageService.formatFearGreedMessage(comprehensiveIndex);
         await messageService.sendMessage(message, botToken, chatId);
         
         console.log('Fear greed task completed');
@@ -181,12 +180,15 @@ export class SchedulerService {
         const ethRSI = await this.marketData.getMultiTimeframeRSI('ethereum');
         const btcEMA = await this.marketData.getEMADistances('bitcoin');
         const ethEMA = await this.marketData.getEMADistances('ethereum');
-        const altIndex = await this.marketData.getFearGreedIndex('alternative');
-        const cmcIndex = await this.marketData.getFearGreedIndex('coinmarketcap');
+        const comprehensiveIndex = await this.marketData.getComprehensiveFearGreedIndex();
         
-        const message = messageService.formatComprehensiveMessage(
-            btcRSI, ethRSI, btcEMA, ethEMA, altIndex, cmcIndex
-        );
+        const message = messageService.formatComprehensiveMessage({
+            btcRSI: btcRSI,
+            ethRSI: ethRSI,
+            btcEMA: btcEMA,
+            ethEMA: ethEMA,
+            fearGreedData: comprehensiveIndex
+        });
         await messageService.sendMessage(message, botToken, chatId);
         
         console.log('Comprehensive task completed');

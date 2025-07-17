@@ -28,35 +28,71 @@ export class MarketDataService {
             const url = `${this.binanceBaseUrl}/klines?symbol=${pair}&interval=${binanceInterval}&limit=${limit}`;
             
             console.log(`Fetching Binance data: ${url}`);
+            console.log(`Environment: ${typeof process !== 'undefined' ? 'Node.js' : 'Browser/Worker'}`);
             
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
             
             console.log(`Binance response status:`, response.status);
+            console.log(`Binance response headers:`, Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error(`Binance API error response:`, errorText);
+                
+                // 如果是 403 错误，尝试使用简化的请求
+                if (response.status === 403) {
+                    console.log('Retrying with simpler request...');
+                    try {
+                        const simpleResponse = await fetch(url);
+                        if (simpleResponse.ok) {
+                            const data = await simpleResponse.json();
+                            return this.formatBinanceData(data);
+                        }
+                    } catch (retryError) {
+                        console.error('Retry failed:', retryError);
+                    }
+                }
+                
+                throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
             }
 
             const data = await response.json();
             console.log(`Binance data length:`, data.length);
+            console.log(`Binance data sample:`, data.slice(0, 2));
             
-            // 转换币安数据格式为内部格式
-            const formattedData = data.map(kline => ({
-                timestamp: kline[0],
-                open: parseFloat(kline[1]),
-                high: parseFloat(kline[2]),
-                low: parseFloat(kline[3]),
-                close: parseFloat(kline[4]),
-                volume: parseFloat(kline[5])
-            }));
-            
-            console.log(`Formatted data sample:`, formattedData.slice(0, 3));
-            
-            return formattedData;
+            return this.formatBinanceData(data);
         } catch (error) {
             console.error(`Error fetching Binance data for ${symbol}:`, error);
+            console.error(`Error stack:`, error.stack);
             throw error;
         }
+    }
+
+    /**
+     * 格式化币安数据
+     * @param {Array} data - 币安 K线数据
+     */
+    formatBinanceData(data) {
+        // 转换币安数据格式为内部格式
+        const formattedData = data.map(kline => ({
+            timestamp: kline[0],
+            open: parseFloat(kline[1]),
+            high: parseFloat(kline[2]),
+            low: parseFloat(kline[3]),
+            close: parseFloat(kline[4]),
+            volume: parseFloat(kline[5])
+        }));
+        
+        console.log(`Formatted data sample:`, formattedData.slice(0, 3));
+        
+        return formattedData;
     }
 
     /**
@@ -68,8 +104,8 @@ export class MarketDataService {
             '15m': '15m',
             '1h': '1h',
             '4h': '4h',
-            '8h': '8h',
-            '12h': '12h',
+            '8h': '8h',      // 币安支持 8h
+            '12h': '12h',    // 币安支持 12h
             '1d': '1d'
         };
         return intervalMap[interval] || '1h';
@@ -144,7 +180,22 @@ export class MarketDataService {
     /**
      * 获取恐惧贪婪指数 (Alternative.me)
      */
-    async getFearGreedIndex() {
+    /**
+     * 获取恐惧贪婪指数
+     * @param {string} source - 数据源 ('alternative' 或 'coinmarketcap')
+     */
+    async getFearGreedIndex(source = 'alternative') {
+        if (source === 'coinmarketcap') {
+            return await this.getCMCFearGreedIndex();
+        } else {
+            return await this.getAlternativeFearGreedIndex();
+        }
+    }
+
+    /**
+     * 获取Alternative.me恐惧贪婪指数
+     */
+    async getAlternativeFearGreedIndex() {
         try {
             const response = await fetch(`${this.altBaseUrl}/?limit=1&format=json`);
             
@@ -197,7 +248,7 @@ export class MarketDataService {
 
             // 并行获取两个数据源的数据
             const [altData, cmcData] = await Promise.allSettled([
-                this.getFearGreedIndex(),
+                this.getAlternativeFearGreedIndex(),
                 this.getCMCFearGreedIndex()
             ]);
 
