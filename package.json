@@ -1,23 +1,28 @@
 {
   "name": "crypto-indicator-bot",
   "version": "1.0.0",
-  "type": "module",
-  "description": "A Telegram bot for cryptocurrency technical indicators using Cloudflare Workers or standalone server",
-  "main": "src/worker.js",
+  "description": "A cryptocurrency indicator bot that analyzes technical indicators and sends notifications",
+  "main": "src/index.js",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
-    "start": "node standalone-server.js",
-    "test": "node test.js"
+    "start": "node src/index.js",
+    "dev": "wrangler dev src/index.js",
+    "deploy": "wrangler deploy src/index.js"
   },
-  "keywords": ["cryptocurrency", "bitcoin", "ethereum", "RSI", "EMA", "telegram", "bot", "cloudflare-workers"],
-  "author": "based on wozulong/open-wegram-bot",
-  "license": "GPL-3.0",
+  "keywords": [
+    "cryptocurrency",
+    "technical-analysis",
+    "indicators",
+    "telegram-bot",
+    "cloudflare-workers"
+  ],
+  "author": "Crypto Indicator Bot",
+  "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.0.0"
+    "axios": "^1.6.0",
+    "node-telegram-bot-api": "^0.64.0",
+    "technicalindicators": "^3.1.0"
   },
   "devDependencies": {
-    "vercel": "^41.4.1",
-    "wrangler": "^4.0.0"
+    "wrangler": "^3.0.0"
   }
 }

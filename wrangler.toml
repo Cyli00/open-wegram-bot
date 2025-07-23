@@ -1,7 +1,21 @@
 name = "crypto-indicator-bot"
-main = "src/worker.js"
-compatibility_date = "2023-05-18"
-keep_vars = true
+main = "src/index.js"
+compatibility_date = "2023-12-01"
 
-[placement]
-mode = "smart"
+# Workers Cron Triggers 配置
+# 每15分钟执行一次
+[[triggers.crons]]
+cron = "*/15 * * * *"
+
+# 每小时执行一次
+[[triggers.crons]]
+cron = "0 * * * *"
+
+[vars]
+# 环境变量将在Cloudflare Workers控制台中设置
+# BOT_TOKEN = ""
+# USER_ID = ""
+# COINMARKETCAP_API_KEY = ""
+# OPENAI_BASE_URL = ""
+# OPENAI_API_KEY = ""
+# MODEL = ""
