@@ -12,7 +12,7 @@ coverage/
 
 # Environment files
 .env
-.env.*
+.wrangler
 
 # OS files
 .DS_Store

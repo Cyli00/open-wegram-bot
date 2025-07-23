@@ -3,13 +3,11 @@ main = "src/index.js"
 compatibility_date = "2023-12-01"
 
 # Workers Cron Triggers 配置
-# 每15分钟执行一次
-[[triggers.crons]]
-cron = "*/15 * * * *"
-
-# 每小时执行一次
-[[triggers.crons]]
-cron = "0 * * * *"
+[triggers]
+crons = [
+  "*/15 * * * *",  # 每15分钟执行一次
+  "0 * * * *"      # 每小时执行一次
+]
 
 [vars]
 # 环境变量将在Cloudflare Workers控制台中设置
