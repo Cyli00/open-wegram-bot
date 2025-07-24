@@ -13,10 +13,19 @@ export async function getCryptoData(symbol, interval, limit = 500) {
     url.searchParams.append('interval', interval);
     url.searchParams.append('limit', limit.toString());
     
-    const response = await fetch(url.toString());
+    // 在Cloudflare Workers中，fetch可能需要额外的配置
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Crypto-Indicator-Bot/1.0 (+https://github.com/leahdoudou666/crypto-indicator-bot)'
+      },
+      // 添加超时处理
+      signal: AbortSignal.timeout(10000) // 10秒超时
+    });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
@@ -31,7 +40,11 @@ export async function getCryptoData(symbol, interval, limit = 500) {
       volume: parseFloat(item[5])
     }));
   } catch (error) {
-    console.error(`获取 ${symbol} 数据失败:`, error.message);
+    if (error.name === 'TimeoutError') {
+      console.error(`获取 ${symbol} 数据失败: 请求超时`);
+    } else {
+      console.error(`获取 ${symbol} 数据失败:`, error.message);
+    }
     throw error;
   }
 }
