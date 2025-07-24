@@ -13,8 +13,19 @@ export async function getCryptoData(symbol, interval, limit = 500) {
     
     // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
     const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
+    
+    // 转换时间间隔参数以适配OKX API
+    const okxIntervalMap = {
+      '15m': '15m',
+      '1h': '1H',
+      '4h': '4H',
+      '1d': '1D'
+    };
+    
+    const okxInterval = okxIntervalMap[interval] || interval;
+    
     url.searchParams.append('instId', okxSymbol);
-    url.searchParams.append('bar', interval);
+    url.searchParams.append('bar', okxInterval);
     url.searchParams.append('limit', limit.toString());
     
     // 在Cloudflare Workers中，fetch可能需要额外的配置

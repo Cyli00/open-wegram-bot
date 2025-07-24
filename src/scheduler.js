@@ -61,6 +61,8 @@ async function handleStartCommand(env) {
     `/stop - 停止机器人推送`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
+}
+
 /**
  * 处理/stop命令
  */
@@ -68,7 +70,6 @@ async function handleStopCommand(env) {
   const message = `*加密货币指标机器人已停止推送!* \n\n机器人将不再主动推送指标信息。如需重新开启，请使用 /start 命令。`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
-}
 }
 
 /**
