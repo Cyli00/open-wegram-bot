@@ -1,4 +1,4 @@
-import { getCryptoData, getAlternativeMeFearGreedIndex, sendTelegramMessage, generateAIAnalysis } from './utils/api.js';
+import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage, generateAIAnalysis } from './utils/api.js';
 import { calculateRSI, calculateEMA, calculateEMADistance } from './utils/indicators.js';
 
 // 支持的交易对

@@ -9,16 +9,20 @@ export function calculateRSI(prices, period) {
     return null;
   }
 
-  let gains = 0;
-  let losses = 0;
+  // 计算价格变化
+  const changes = [];
+  for (let i = 1; i < prices.length; i++) {
+    changes.push(prices[i] - prices[i - 1]);
+  }
 
   // 计算第一个周期的平均 gain 和 loss
-  for (let i = 1; i <= period; i++) {
-    const change = prices[i] - prices[i - 1];
-    if (change >= 0) {
-      gains += change;
+  let gains = 0;
+  let losses = 0;
+  for (let i = 0; i < period; i++) {
+    if (changes[i] > 0) {
+      gains += changes[i];
     } else {
-      losses -= change;
+      losses -= changes[i];
     }
   }
 
@@ -26,17 +30,10 @@ export function calculateRSI(prices, period) {
   let avgLoss = losses / period;
 
   // 计算后续的RSI值
-  for (let i = period + 1; i < prices.length; i++) {
-    const change = prices[i] - prices[i - 1];
-    let gain = 0;
-    let loss = 0;
-
-    if (change >= 0) {
-      gain = change;
-    } else {
-      loss = -change;
-    }
-
+  for (let i = period; i < changes.length; i++) {
+    const gain = changes[i] > 0 ? changes[i] : 0;
+    const loss = changes[i] < 0 ? -changes[i] : 0;
+    
     avgGain = (avgGain * (period - 1) + gain) / period;
     avgLoss = (avgLoss * (period - 1) + loss) / period;
   }
