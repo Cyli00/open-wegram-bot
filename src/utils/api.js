@@ -7,10 +7,14 @@
  */
 export async function getCryptoData(symbol, interval, limit = 500) {
   try {
-    // 使用Binance API获取数据
-    const url = new URL('https://api.binance.com/api/v3/klines');
-    url.searchParams.append('symbol', symbol);
-    url.searchParams.append('interval', interval);
+    // 使用OKX API获取数据
+    const baseUrl = 'https://www.okx.com';
+    const url = new URL(`${baseUrl}/api/v5/market/candles`);
+    
+    // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
+    const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
+    url.searchParams.append('instId', okxSymbol);
+    url.searchParams.append('bar', interval);
     url.searchParams.append('limit', limit.toString());
     
     // 在Cloudflare Workers中，fetch可能需要额外的配置
@@ -28,11 +32,16 @@ export async function getCryptoData(symbol, interval, limit = 500) {
       throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
+    const result = await response.json();
     
+    // OKX API返回的数据格式: [ts, o, h, l, c, vol, volCcy, confirm]
     // 解析数据，返回 [timestamp, open, high, low, close, volume, ...] 格式
-    return data.map(item => ({
-      timestamp: item[0],
+    if (result.code !== '0' || !result.data) {
+      throw new Error(`OKX API error: ${result.msg || 'Unknown error'}`);
+    }
+    
+    return result.data.map(item => ({
+      timestamp: parseInt(item[0]),
       open: parseFloat(item[1]),
       high: parseFloat(item[2]),
       low: parseFloat(item[3]),

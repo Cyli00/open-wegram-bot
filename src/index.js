@@ -31,6 +31,9 @@ export default {
               case '/ai':
                 await handleAiCommand(env);
                 break;
+              case '/stop':
+                await handleStopCommand(env);
+                break;
               default:
                 // 发送帮助信息
                 await sendHelpMessage(env);
@@ -57,6 +60,7 @@ export default {
 async function sendHelpMessage(env) {
   const message = `*加密货币指标机器人命令列表:*\n\n` +
     `/start - 开启机器人推送\n` +
+    `/stop - 停止机器人推送\n` +
     `/rsi - 手动触发RSI指标\n` +
     `/ema - 手动触发价格和EMA分析\n` +
     `/feargreed - 手动触发恐惧贪婪指数\n` +
