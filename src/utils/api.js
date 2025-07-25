@@ -8,56 +8,45 @@
 export async function getCryptoData(symbol, interval, limit = 500) {
   try {
     // 使用OKX API获取数据
-    const baseUrl = 'https://www.okx.com';
-    const url = new URL(`${baseUrl}/api/v5/market/candles`);
-    
+    const baseUrl = 'https://www.okx.com/api/v5/market/index-candles';
+
     // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
     const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
-    
-    // 转换时间间隔参数以适配OKX API
-    const okxIntervalMap = {
-      '15m': '15m',
-      '1h': '1H',
-      '4h': '4H',
-      '1d': '1D'
-    };
-    
-    const okxInterval = okxIntervalMap[interval] || interval;
-    
-    url.searchParams.append('instId', okxSymbol);
-    url.searchParams.append('bar', okxInterval);
-    url.searchParams.append('limit', limit.toString());
-    
-    // 在Cloudflare Workers中，fetch可能需要额外的配置
-    const response = await fetch(url.toString(), {
+
+    // 直接使用传入的时间间隔参数，OKX API支持15m, 1H, 4H, 1D等格式
+
+    // 构建查询参数
+    const params = new URLSearchParams({
+      instId: okxSymbol,
+      bar: interval,
+      limit: limit.toString()
+    });
+
+    const response = await fetch(`${baseUrl}?${params}`, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Crypto-Indicator-Bot/1.0 (+https://github.com/leahdoudou666/crypto-indicator-bot)'
-      },
-      // 添加超时处理
-      signal: AbortSignal.timeout(10000) // 10秒超时
+        'Content-Type': 'application/json'
+      }
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
     }
-    
+
     const result = await response.json();
-    
-    // OKX API返回的数据格式: [ts, o, h, l, c, vol, volCcy, confirm]
-    // 解析数据，返回 [timestamp, open, high, low, close, volume, ...] 格式
+
+    // OKX API返回的数据格式: [ts, o, h, l, c, confirm]
+    // 解析数据，返回 [timestart, open, high, low, close] 格式
     if (result.code !== '0' || !result.data) {
       throw new Error(`OKX API error: ${result.msg || 'Unknown error'}`);
     }
-    
+
     return result.data.map(item => ({
-      timestamp: parseInt(item[0]),
+      timestart: parseInt(item[0]),
       open: parseFloat(item[1]),
       high: parseFloat(item[2]),
       low: parseFloat(item[3]),
-      close: parseFloat(item[4]),
-      volume: parseFloat(item[5])
+      close: parseFloat(item[4])
     }));
   } catch (error) {
     if (error.name === 'TimeoutError') {
