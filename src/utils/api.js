@@ -5,24 +5,24 @@
  * @param {number} limit - 数据数量
  * @returns {Promise<object[]>} K线数据
  */
-export async function getCryptoData(symbol, interval, limit = 500) {
+export async function getCryptoData(symbol, interval, limit = 200) {
   try {
-    // 使用OKX API获取数据
-    const baseUrl = 'https://www.okx.com/api/v5/market/index-candles';
+    // okx base url
+    const baseUrl = 'https://www.okx.com';
 
     // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
     const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
-
-    // 直接使用传入的时间间隔参数，OKX API支持15m, 1H, 4H, 1D等格式
+    const okxInterval = interval.replace('m', 'M').replace('h', 'H').replace('d', 'D');
 
     // 构建查询参数
     const params = new URLSearchParams({
       instId: okxSymbol,
-      bar: interval,
-      limit: limit.toString()
+      bar: okxInterval,
+      limit: limit
     });
-
-    const response = await fetch(`${baseUrl}?${params}`, {
+    // 获取K线指数价格
+    const kline_url = `${baseUrl}/api/v5/market/index-candles`;
+    const response = await fetch(`${kline_url}?${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -135,48 +135,4 @@ export async function sendTelegramMessage(token, chatId, message) {
     throw error;
   }
 }
-
-/**
- * 调用AI API生成综合技术分析报告
- * @param {string} baseUrl - AI API基础URL
- * @param {string} apiKey - API密钥
- * @param {string} model - 模型名称
- * @param {string} prompt - 提示词
- * @returns {Promise<string>} AI生成的分析报告
- */
-export async function generateAIAnalysis(baseUrl, apiKey, model, prompt) {
-  try {
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content: "你是一个专业的加密货币技术分析师，能够根据提供的技术指标数据生成专业的分析报告。"
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    return data.choices[0].message.content;
-  } catch (error) {
-    console.error('调用AI API失败:', error.message);
-    throw error;
-  }
-}
+      
