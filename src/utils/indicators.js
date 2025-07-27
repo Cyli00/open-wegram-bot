@@ -29,21 +29,32 @@ export function calculateRSI(prices, period) {
   let avgGain = gains / period;
   let avgLoss = losses / period;
 
-  // 计算后续的RSI值
+  // 计算第一个RSI值
+  if (avgLoss === 0) {
+    return 100;
+  }
+  
+  let rs = avgGain / avgLoss;
+  let rsi = 100 - (100 / (1 + rs));
+
+  // 使用指数平滑方法计算后续的RSI值
   for (let i = period; i < changes.length; i++) {
     const gain = changes[i] > 0 ? changes[i] : 0;
     const loss = changes[i] < 0 ? -changes[i] : 0;
     
+    // 使用Wilder's平滑方法（RSI标准方法）
     avgGain = (avgGain * (period - 1) + gain) / period;
     avgLoss = (avgLoss * (period - 1) + loss) / period;
+    
+    if (avgLoss === 0) {
+      rsi = 100;
+    } else {
+      rs = avgGain / avgLoss;
+      rsi = 100 - (100 / (1 + rs));
+    }
   }
 
-  if (avgLoss === 0) {
-    return 100;
-  }
-
-  const rs = avgGain / avgLoss;
-  return 100 - (100 / (1 + rs));
+  return rsi;
 }
 
 /**

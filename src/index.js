@@ -1,4 +1,4 @@
-import { handleScheduled, handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand, handleAiCommand } from './scheduler.js';
+import { handleScheduled, handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand } from './scheduler.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -27,9 +27,6 @@ export default {
                 break;
               case '/feargreed':
                 await handleFearGreedCommand(env);
-                break;
-              case '/ai':
-                await handleAiCommand(env);
                 break;
               case '/stop':
                 await handleStopCommand(env);

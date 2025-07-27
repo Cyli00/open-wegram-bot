@@ -12,7 +12,7 @@ export async function getCryptoData(symbol, interval, limit = 200) {
 
     // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
     const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
-    const okxInterval = interval.replace('m', 'M').replace('h', 'H').replace('d', 'D');
+    const okxInterval = interval.replace('h', 'H').replace('d', 'D');
 
     // 构建查询参数
     const params = new URLSearchParams({
@@ -23,10 +23,7 @@ export async function getCryptoData(symbol, interval, limit = 200) {
     // 获取K线指数价格
     const kline_url = `${baseUrl}/api/v5/market/index-candles`;
     const response = await fetch(`${kline_url}?${params}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      method: 'GET'
     });
 
     if (!response.ok) {
@@ -36,18 +33,13 @@ export async function getCryptoData(symbol, interval, limit = 200) {
     const result = await response.json();
 
     // OKX API返回的数据格式: [ts, o, h, l, c, confirm]
-    // 解析数据，返回 [timestart, open, high, low, close] 格式
-    if (result.code !== '0' || !result.data) {
-      throw new Error(`OKX API error: ${result.msg || 'Unknown error'}`);
-    }
-
-    return result.data.map(item => ({
-      timestart: parseInt(item[0]),
-      open: parseFloat(item[1]),
-      high: parseFloat(item[2]),
-      low: parseFloat(item[3]),
-      close: parseFloat(item[4])
-    }));
+    // 解析数据，返回 [open, high, low, close] 格式，按时间排序
+    return result.data.map(item => [
+      parseFloat(item[1]), // open
+      parseFloat(item[2]), // high
+      parseFloat(item[3]), // low
+      parseFloat(item[4])  // close
+    ]);
   } catch (error) {
     if (error.name === 'TimeoutError') {
       console.error(`获取 ${symbol} 数据失败: 请求超时`);
@@ -135,4 +127,3 @@ export async function sendTelegramMessage(token, chatId, message) {
     throw error;
   }
 }
-      

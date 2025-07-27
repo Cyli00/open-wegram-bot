@@ -1,8 +1,8 @@
-import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage, generateAIAnalysis } from './utils/api.js';
+import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage } from './utils/api.js';
 import { calculateRSI, calculateEMA, calculateEMADistance } from './utils/indicators.js';
 
 // 支持的交易对
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
+const SYMBOLS = ['BTC-USDT', 'ETH-USDT'];
 
 // 支持的时间框架
 const TIMEFRAMES = {
