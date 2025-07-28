@@ -33,13 +33,15 @@ export async function getCryptoData(symbol, interval, limit = 200) {
     const result = await response.json();
 
     // OKX API返回的数据格式: [ts, o, h, l, c, confirm]
-    // 解析数据，返回 [open, high, low, close] 格式，按时间排序
-    return result.data.map(item => [
-      parseFloat(item[1]), // open
-      parseFloat(item[2]), // high
-      parseFloat(item[3]), // low
-      parseFloat(item[4])  // close
-    ]);
+    // 解析数据，返回 [open, high, low, close] 格式，按时间正序排列
+    return result.data
+      .map(item => [
+        parseFloat(item[1]), // open
+        parseFloat(item[2]), // high
+        parseFloat(item[3]), // low
+        parseFloat(item[4])  // close
+      ])
+      .reverse(); // 将数据反转为时间正序（从旧到新）
   } catch (error) {
     if (error.name === 'TimeoutError') {
       console.error(`获取 ${symbol} 数据失败: 请求超时`);
@@ -77,9 +79,11 @@ export async function getAlternativeMeFearGreedIndex() {
  */
 export async function getCoinMarketCapFearGreedIndex(apiKey) {
   try {
-    const response = await fetch('https://pro-api.coinmarketcap.com/v1/fear-and-greed/latest', {
+    // 使用正确的API端点：v3/fear-and-greed/latest
+    const response = await fetch('https://pro-api.coinmarketcap.com/v3/fear-and-greed/latest', {
       headers: {
-        'X-CMC_PRO_API_KEY': apiKey
+        'X-CMC_PRO_API_KEY': apiKey,
+        'Accept': 'application/json'
       }
     });
     

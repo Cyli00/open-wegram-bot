@@ -1,11 +1,16 @@
 /**
  * 计算RSI指标
- * @param {number[]} prices - 价格数组
- * @param {number} period - 周期
- * @returns {number} RSI值
+ * @param {number[]} prices - 价格数组（按时间顺序，从旧到新）
+ * @param {number} period - 周期（默认14）
+ * @returns {number|null} RSI值（0-100）或null
  */
-export function calculateRSI(prices, period) {
-  if (prices.length < period + 1) {
+export function calculateCurrentRSI(prices, period = 14) {
+  if (!Array.isArray(prices) || prices.length < period + 1) {
+    return null;
+  }
+
+  // 验证输入数据有效性
+  if (prices.some(price => typeof price !== 'number' || isNaN(price))) {
     return null;
   }
 
@@ -15,72 +20,73 @@ export function calculateRSI(prices, period) {
     changes.push(prices[i] - prices[i - 1]);
   }
 
-  // 计算第一个周期的平均 gain 和 loss
-  let gains = 0;
-  let losses = 0;
+  // 分离涨跌幅并计算初始平均值
+  let sumGain = 0;
+  let sumLoss = 0;
+  
   for (let i = 0; i < period; i++) {
     if (changes[i] > 0) {
-      gains += changes[i];
-    } else {
-      losses -= changes[i];
+      sumGain += changes[i];
+    } else if (changes[i] < 0) {
+      sumLoss += Math.abs(changes[i]);
     }
   }
 
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
+  let avgGain = sumGain / period;
+  let avgLoss = sumLoss / period;
 
-  // 计算第一个RSI值
-  if (avgLoss === 0) {
-    return 100;
-  }
-  
-  let rs = avgGain / avgLoss;
-  let rsi = 100 - (100 / (1 + rs));
-
-  // 使用指数平滑方法计算后续的RSI值
+  // 使用Wilder's平滑方法计算后续值
   for (let i = period; i < changes.length; i++) {
     const gain = changes[i] > 0 ? changes[i] : 0;
-    const loss = changes[i] < 0 ? -changes[i] : 0;
+    const loss = changes[i] < 0 ? Math.abs(changes[i]) : 0;
     
-    // 使用Wilder's平滑方法（RSI标准方法）
+    // Wilder's平滑公式
     avgGain = (avgGain * (period - 1) + gain) / period;
     avgLoss = (avgLoss * (period - 1) + loss) / period;
-    
-    if (avgLoss === 0) {
-      rsi = 100;
-    } else {
-      rs = avgGain / avgLoss;
-      rsi = 100 - (100 / (1 + rs));
-    }
   }
 
-  return rsi;
+  // 计算最终RSI
+  if (avgLoss === 0) {
+    return avgGain > 0 ? 100 : 50;
+  }
+  
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  
+  // 确保RSI在有效范围内
+  return Math.max(0, Math.min(100, rsi));
 }
 
 /**
  * 计算EMA指标
- * @param {number[]} prices - 价格数组
+ * @param {number[]} prices - 价格数组（按时间顺序，从旧到新）
  * @param {number} period - 周期
- * @returns {number} EMA值
+ * @returns {number|null} EMA值或null
  */
-export function calculateEMA(prices, period) {
-  if (prices.length < period) {
+export function calculateCurrentEMA(prices, period) {
+  if (!Array.isArray(prices) || prices.length < period || period <= 0) {
     return null;
   }
 
-  // 计算第一个SMA
+  // 验证输入数据有效性
+  if (prices.some(price => typeof price !== 'number' || isNaN(price))) {
+    return null;
+  }
+
+  // 计算初始SMA作为第一个EMA值
   let sum = 0;
   for (let i = 0; i < period; i++) {
     sum += prices[i];
   }
   let ema = sum / period;
 
-  // 计算EMA乘数
+  // 计算平滑系数（标准EMA公式）
   const multiplier = 2 / (period + 1);
 
-  // 计算后续的EMA值
+  // 从第period个数据开始计算EMA
   for (let i = period; i < prices.length; i++) {
-    ema = (prices[i] - ema) * multiplier + ema;
+    // 标准EMA公式：EMA = (当前价格 × 平滑系数) + (前一个EMA × (1 - 平滑系数))
+    ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
   }
 
   return ema;
@@ -90,11 +96,15 @@ export function calculateEMA(prices, period) {
  * 计算价格与EMA的距离百分比
  * @param {number} price - 当前价格
  * @param {number} ema - EMA值
- * @returns {number} 距离百分比
+ * @returns {number|null} 距离百分比或null（正值表示价格高于EMA）
  */
 export function calculateEMADistance(price, ema) {
-  if (ema === 0) {
-    return 0;
+  // 输入验证
+  if (typeof price !== 'number' || typeof ema !== 'number' || 
+      isNaN(price) || isNaN(ema) || ema <= 0) {
+    return null;
   }
+  
+  // 计算百分比距离
   return ((price - ema) / ema) * 100;
 }

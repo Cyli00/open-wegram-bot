@@ -25,11 +25,8 @@ export default {
               case '/ema':
                 await handleEmaCommand(env);
                 break;
-              case '/feargreed':
+              case '/fng':
                 await handleFearGreedCommand(env);
-                break;
-              case '/stop':
-                await handleStopCommand(env);
                 break;
               default:
                 // 发送帮助信息
@@ -57,12 +54,9 @@ export default {
 async function sendHelpMessage(env) {
   const message = `*加密货币指标机器人命令列表:*\n\n` +
     `/start - 开启机器人推送\n` +
-    `/stop - 停止机器人推送\n` +
     `/rsi - 手动触发RSI指标\n` +
     `/ema - 手动触发价格和EMA分析\n` +
-    `/feargreed - 手动触发恐惧贪婪指数\n` +
-    `/ai - 调用AI生成综合技术分析报告`;
-  
+    `/fng - 手动触发恐惧贪婪指数\n`;
   try {
     const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',

@@ -1,5 +1,5 @@
 import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage } from './utils/api.js';
-import { calculateRSI, calculateEMA, calculateEMADistance } from './utils/indicators.js';
+import { calculateCurrentRSI, calculateCurrentEMA, calculateEMADistance } from './utils/indicators.js';
 
 // 支持的交易对
 const SYMBOLS = ['BTC-USDT', 'ETH-USDT'];
@@ -13,6 +13,22 @@ const TIMEFRAMES = {
 };
 
 /**
+ * 检查机器人是否处于激活状态
+ * @param {object} env - 环境变量
+ * @returns {Promise<boolean>} 是否激活
+ */
+async function isBotActive(env) {
+  try {
+    const status = await env.BOT_STATE.get('active');
+    return status === 'true';
+  } catch (error) {
+    console.error('检查机器人状态失败:', error);
+    // 默认返回false，确保安全
+    return false;
+  }
+}
+
+/**
  * 处理定时任务
  * @param {object} event - Cloudflare Workers定时事件
  * @param {object} env - 环境变量
@@ -20,6 +36,15 @@ const TIMEFRAMES = {
 export async function handleScheduled(event, env) {
   const cron = event.cron;
   console.log(`执行定时任务: ${cron}`);
+  // 检查机器人是否激活
+  const isActive = await isBotActive(env);
+  if (isActive) {
+    console.log('机器人激活!');
+  } else {
+    console.log('机器人未激活，跳过定时任务');
+    return;
+  }
+  
   if (cron === '0 * * * *') {
     try {
       await handleHourlyTask(env);
@@ -30,36 +55,30 @@ export async function handleScheduled(event, env) {
 }
 
 // 导出处理slash command的函数
-export { handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand, handleStopCommand };
+export { handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand };
 
 /**
  * 处理/start命令
  */
 async function handleStartCommand(env) {
+  // 设置机器人为激活状态
+  await env.BOT_STATE.put('active', 'true');
+  
   const message = `*加密货币指标机器人已启动!*\n\n` +
     `你可以使用以下命令:\n` +
     `/rsi - 获取RSI指标\n` +
     `/ema - 获取价格和EMA分析\n` +
-    `/feargreed - 获取恐惧贪婪指数\n` +
-    `/stop - 停止机器人推送`;
+    `/fng - 获取恐惧贪婪指数\n`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
 }
 
-/**
- * 处理/stop命令
- */
-async function handleStopCommand(env) {
-  const message = `*加密货币指标机器人已停止推送!* \n\n机器人将不再主动推送指标信息。如需重新开启，请使用 /start 命令。`;
-  
-  await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
-}
 
 /**
  * 处理/rsi命令
  */
 async function handleRsiCommand(env) {
-  await handle15MinTask(env);
+  await sendRsiFrames(env);
 }
 
 /**
@@ -79,7 +98,7 @@ async function handleFearGreedCommand(env) {
 /**
  * 每15分钟任务：推送RSI指标
  */
-async function handle15MinTask(env) {
+async function sendRsiFrames(env) {
   console.log('执行每15分钟任务');
   
   let message = '*📈 多时间框架RSI指标*\n\n';
@@ -91,13 +110,13 @@ async function handle15MinTask(env) {
     for (const [interval, label] of Object.entries(TIMEFRAMES)) {
       try {
         const data = await getCryptoData(symbol, interval, 200);
-        const closes = data.map(d => d.close);
+        const closes = data.map(d => d[3]); // d[3] 是 close 价格
         
-        // 计算6周期和14周期RSI
-        const rsi6 = calculateRSI(closes, 6);
-        const rsi14 = calculateRSI(closes, 14);
-        
-        message += `${label}: RSI(6) ${rsi6 ? rsi6.toFixed(2) : 'N/A'}, RSI(14) ${rsi14 ? rsi14.toFixed(2) : 'N/A'}\n`;
+        // 计算7周期和14周期RSI
+        const rsi7 = calculateCurrentRSI(closes, 7);
+        const rsi14 = calculateCurrentRSI(closes, 14);
+
+        message += `${label}: RSI(7) ${rsi7 ? rsi7.toFixed(2) : 'N/A'}, RSI(14) ${rsi14 ? rsi14.toFixed(2) : 'N/A'}\n`;
       } catch (error) {
         message += `${label}: 数据获取失败\n`;
         console.error(`获取${symbol} ${interval}数据失败:`, error);
@@ -115,15 +134,9 @@ async function handle15MinTask(env) {
  */
 async function handleHourlyTask(env) {
   console.log('执行每小时任务');
-  
-  // 1. 推送价格和EMA距离分析
+  await sendRsiFrames(env);
   await sendPriceAndEMADistance(env);
-  
-  // 2. 推送恐惧贪婪指数
   await sendFearGreedIndex(env);
-  
-  // 3. 推送综合技术分析报告
-  await sendTechnicalAnalysisReport(env);
 }
 
 /**
@@ -138,14 +151,14 @@ async function sendPriceAndEMADistance(env) {
     try {
       // 获取1小时数据用于EMA计算
       const data = await getCryptoData(symbol, '1h', 300);
-      const closes = data.map(d => d.close);
-      const currentPrice = closes[closes.length - 1];
+      const closes = data.map(d => d[3]); // d[3] 是 close 价格
+      const currentPrice = closes[closes.length - 1]; // 现在是正序，最后一个是最新价格
       
       // 计算不同周期的EMA
-      const ema50 = calculateEMA(closes, 50);
-      const ema100 = calculateEMA(closes, 100);
-      const ema200 = calculateEMA(closes, 200);
-      
+      const ema50 = calculateCurrentEMA(closes, 50);
+      const ema100 = calculateCurrentEMA(closes, 100);
+      const ema200 = calculateCurrentEMA(closes, 200);
+
       // 计算EMA距离
       const distance50 = ema50 ? calculateEMADistance(currentPrice, ema50) : null;
       const distance100 = ema100 ? calculateEMADistance(currentPrice, ema100) : null;
@@ -185,11 +198,15 @@ async function sendFearGreedIndex(env) {
     if (env.COINMARKETCAP_API_KEY) {
       try {
         const cmcData = await getCoinMarketCapFearGreedIndex(env.COINMARKETCAP_API_KEY);
-        // 这里处理CoinMarketCap数据
-        message += `*CoinMarketCap*\n`;
-        message += `数据: 暂未实现\n\n`;
+        const cmcIndex = cmcData.data;
+        message += `*CoinMarketCap.com*\n`;
+        message += `指数: ${cmcIndex.value}\n`;
+        message += `状态: ${cmcIndex.value_classification}\n`;
+        message += `更新时间: ${cmcIndex.update_time}\n\n`;
       } catch (error) {
         console.error('获取CoinMarketCap恐惧贪婪指数失败:', error);
+        message += `*CoinMarketCap*\n`;
+        message += `获取失败: ${error.message}\n\n`;
       }
     }
   } catch (error) {
@@ -199,21 +216,4 @@ async function sendFearGreedIndex(env) {
   
   // 发送消息
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
-}
-
-/**
- * 发送综合技术分析报告
- */
-async function sendTechnicalAnalysisReport(env, isAI = false) {
-  if (isAI && env.OPENAI_BASE_URL && env.OPENAI_API_KEY && env.MODEL) {
-    // 使用AI生成分析报告
-    await sendAIAnalysisReport(env);
-  } else {
-    // 默认报告
-    let message = '*📈 综合技术分析报告*\n\n';
-    message += '报告内容待完善...\n';
-    
-    // 发送消息
-    await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
-  }
 }
