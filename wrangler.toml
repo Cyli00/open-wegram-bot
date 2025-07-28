@@ -5,15 +5,18 @@ compatibility_date = "2023-12-01"
 # Workers Cron Triggers 配置
 [triggers]
 crons = [
-  "*/15 * * * *",  # 每15分钟执行一次
   "0 * * * *"      # 每小时执行一次
 ]
+
+# KV 命名空间绑定
+[[kv_namespaces]]
+binding = "BOT_STATE"
+id = "75ee02ab718b422083ed79e228f80238"
+# id = "${KV_NAMESPACE_ID}"
 
 [vars]
 # 环境变量将在Cloudflare Workers控制台中设置
 # BOT_TOKEN = ""
 # USER_ID = ""
 # COINMARKETCAP_API_KEY = ""
-# OPENAI_BASE_URL = ""
-# OPENAI_API_KEY = ""
-# MODEL = ""
+# KV_NAMESPACE_ID = ""
