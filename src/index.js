@@ -1,4 +1,4 @@
-import { handleScheduled, handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand } from './scheduler.js';
+import { handleScheduled, handleStartCommand, handleIndicatorCommand } from './scheduler.js';
 
 export default {
   async fetch(request, env, ctx) {
@@ -19,14 +19,8 @@ export default {
               case '/start':
                 await handleStartCommand(env);
                 break;
-              case '/rsi':
-                await handleRsiCommand(env);
-                break;
-              case '/ema':
-                await handleEmaCommand(env);
-                break;
-              case '/fng':
-                await handleFearGreedCommand(env);
+              case '/indicator':
+                await handleIndicatorCommand(env);
                 break;
               default:
                 // 发送帮助信息
@@ -54,9 +48,7 @@ export default {
 async function sendHelpMessage(env) {
   const message = `*加密货币指标机器人命令列表:*\n\n` +
     `/start - 开启机器人推送\n` +
-    `/rsi - 手动触发RSI指标\n` +
-    `/ema - 手动触发价格和EMA分析\n` +
-    `/fng - 手动触发恐惧贪婪指数\n`;
+    `/indicator - 手动触发技术指标分析\n`;
   try {
     const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',

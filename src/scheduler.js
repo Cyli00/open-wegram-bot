@@ -55,7 +55,7 @@ export async function handleScheduled(event, env) {
 }
 
 // 导出处理slash command的函数
-export { handleStartCommand, handleRsiCommand, handleEmaCommand, handleFearGreedCommand };
+export { handleStartCommand, handleIndicatorCommand };
 
 /**
  * 处理/start命令
@@ -66,154 +66,204 @@ async function handleStartCommand(env) {
   
   const message = `*加密货币指标机器人已启动!*\n\n` +
     `你可以使用以下命令:\n` +
-    `/rsi - 获取RSI指标\n` +
-    `/ema - 获取价格和EMA分析\n` +
-    `/fng - 获取恐惧贪婪指数\n`;
+    `/indicator - 获取技术指标分析\n`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
 }
 
 
 /**
- * 处理/rsi命令
+ * 处理/indicator命令
  */
-async function handleRsiCommand(env) {
-  await sendRsiFrames(env);
+async function handleIndicatorCommand(env) {
+  await sendTechnicalIndicators(env);
 }
 
-/**
- * 处理/ema命令
- */
-async function handleEmaCommand(env) {
-  await sendPriceAndEMADistance(env);
-}
 
 /**
- * 处理/feargreed命令
+ * 获取当前价格
  */
-async function handleFearGreedCommand(env) {
-  await sendFearGreedIndex(env);
-}
-
-/**
- * 每15分钟任务：推送RSI指标
- */
-async function sendRsiFrames(env) {
-  console.log('执行每15分钟任务');
-  
-  let message = '*📈 多时间框架RSI指标*\n\n';
-  
+async function getCurrentPrices() {
+  let priceData = '';
   for (const symbol of SYMBOLS) {
-    message += `*${symbol}*\n`;
-    
-    // 获取不同时间框架的数据
-    for (const [interval, label] of Object.entries(TIMEFRAMES)) {
-      try {
-        const data = await getCryptoData(symbol, interval, 200);
-        const closes = data.map(d => d[3]); // d[3] 是 close 价格
-        
-        // 计算7周期和14周期RSI
-        const rsi7 = calculateCurrentRSI(closes, 7);
-        const rsi14 = calculateCurrentRSI(closes, 14);
-
-        message += `${label}: RSI(7) ${rsi7 ? rsi7.toFixed(2) : 'N/A'}, RSI(14) ${rsi14 ? rsi14.toFixed(2) : 'N/A'}\n`;
-      } catch (error) {
-        message += `${label}: 数据获取失败\n`;
-        console.error(`获取${symbol} ${interval}数据失败:`, error);
-      }
-    }
-    message += '\n';
-  }
-  
-  // 发送消息
-  await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
-}
-
-/**
- * 每小时任务：推送价格和EMA距离分析、恐惧贪婪指数、综合技术分析报告
- */
-async function handleHourlyTask(env) {
-  console.log('执行每小时任务');
-  await sendRsiFrames(env);
-  await sendPriceAndEMADistance(env);
-  await sendFearGreedIndex(env);
-}
-
-/**
- * 发送价格和EMA距离分析
- */
-async function sendPriceAndEMADistance(env) {
-  let message = '*📊 价格和EMA距离分析*\n\n';
-  
-  for (const symbol of SYMBOLS) {
-    message += `*${symbol}*\n`;
-    
     try {
-      // 获取1小时数据用于EMA计算
-      const data = await getCryptoData(symbol, '1h', 300);
-      const closes = data.map(d => d[3]); // d[3] 是 close 价格
-      const currentPrice = closes[closes.length - 1]; // 现在是正序，最后一个是最新价格
-      
-      // 计算不同周期的EMA
-      const ema50 = calculateCurrentEMA(closes, 50);
-      const ema100 = calculateCurrentEMA(closes, 100);
-      const ema200 = calculateCurrentEMA(closes, 200);
-
-      // 计算EMA距离
-      const distance50 = ema50 ? calculateEMADistance(currentPrice, ema50) : null;
-      const distance100 = ema100 ? calculateEMADistance(currentPrice, ema100) : null;
-      const distance200 = ema200 ? calculateEMADistance(currentPrice, ema200) : null;
-      
-      message += `当前价格: $${currentPrice.toFixed(2)}\n`;
-      message += `EMA50距离: ${distance50 ? distance50.toFixed(2) + '%' : 'N/A'}\n`;
-      message += `EMA100距离: ${distance100 ? distance100.toFixed(2) + '%' : 'N/A'}\n`;
-      message += `EMA200距离: ${distance200 ? distance200.toFixed(2) + '%' : 'N/A'}\n\n`;
+      const data = await getCryptoData(symbol, '1h', 1);
+      const currentPrice = data[0][3];
+      priceData += `${symbol}: *$${currentPrice.toFixed(2)}*\n`;
     } catch (error) {
-      message += '数据获取失败\n\n';
-      console.error(`获取${symbol}数据失败:`, error);
+      priceData += `${symbol}: N/A\n`;
     }
   }
-  
-  // 发送消息
-  await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
+  return priceData.slice(0, -1);
 }
 
 /**
- * 发送恐惧贪婪指数
+ * 获取恐慌指数
  */
-async function sendFearGreedIndex(env) {
-  let message = '*😨 恐惧贪婪指数*\n\n';
-  
+async function getFearGreedIndex(env) {
   try {
-    // 获取Alternative.me恐惧贪婪指数
     const altMeData = await getAlternativeMeFearGreedIndex();
     const altMeIndex = altMeData.data[0];
     
-    message += `*Alternative.me*\n`;
-    message += `指数: ${altMeIndex.value}\n`;
-    message += `状态: ${altMeIndex.value_classification}\n`;
-    message += `更新时间: ${altMeIndex.timestamp}\n\n`;
+    let fearGreedData = `😨 *恐惧贪婪指数*\n` +
+      `*Alternative.me*: ${altMeIndex.value} (${altMeIndex.value_classification})`;
     
     // 如果有CoinMarketCap API密钥，也获取其数据
     if (env.COINMARKETCAP_API_KEY) {
       try {
         const cmcData = await getCoinMarketCapFearGreedIndex(env.COINMARKETCAP_API_KEY);
         const cmcIndex = cmcData.data;
-        message += `*CoinMarketCap.com*\n`;
-        message += `指数: ${cmcIndex.value}\n`;
-        message += `状态: ${cmcIndex.value_classification}\n`;
-        message += `更新时间: ${cmcIndex.update_time}\n\n`;
+        fearGreedData += `\n*CoinMarketCap*: ${cmcIndex.value} (${cmcIndex.value_classification})`;
       } catch (error) {
         console.error('获取CoinMarketCap恐惧贪婪指数失败:', error);
-        message += `*CoinMarketCap*\n`;
-        message += `获取失败: ${error.message}\n\n`;
       }
     }
+    
+    return fearGreedData;
   } catch (error) {
-    message += '数据获取失败\n';
-    console.error('获取恐惧贪婪指数失败:', error);
+    return '😨 *恐惧贪婪指数*\n  数据获取失败';
+  }
+}
+
+/**
+ * 获取RSI数据
+ */
+async function getRSIData() {
+  let rsiData = [];
+  
+  for (const symbol of SYMBOLS) {
+    let symbolData = { symbol, timeframes: [] };
+    
+    // 获取不同时间框架的数据
+    for (const [interval, label] of Object.entries(TIMEFRAMES)) {
+      try {
+        const data = await getCryptoData(symbol, interval, 200);
+        const closes = data.map(d => d[3]);
+        
+        // 计算RSI
+        const rsi7 = calculateCurrentRSI(closes, 7);
+        const rsi14 = calculateCurrentRSI(closes, 14);
+        
+        symbolData.timeframes.push({
+          interval: label,
+          rsi7: rsi7 ? rsi7.toFixed(2) : 'N/A',
+          rsi14: rsi14 ? rsi14.toFixed(2) : 'N/A'
+        });
+      } catch (error) {
+        symbolData.timeframes.push({
+          interval: label,
+          rsi7: 'N/A',
+          rsi14: 'N/A'
+        });
+        console.error(`获取${symbol} ${interval}RSI数据失败:`, error);
+      }
+    }
+    rsiData.push(symbolData);
   }
   
-  // 发送消息
+  return rsiData;
+}
+
+/**
+ * 获取4小时EMA数据
+ */
+async function get4HourEMAData() {
+  let emaData = [];
+  
+  for (const symbol of SYMBOLS) {
+    try {
+      const data = await getCryptoData(symbol, '4h', 300);
+      const closes = data.map(d => d[3]);
+      const currentPrice = closes[closes.length - 1];
+      
+      const ema20 = calculateCurrentEMA(closes, 20);
+      const ema50 = calculateCurrentEMA(closes, 50);
+      const ema100 = calculateCurrentEMA(closes, 100);
+      const ema200 = calculateCurrentEMA(closes, 200);
+      
+      const distance20 = ema20 ? calculateEMADistance(currentPrice, ema20) : null;
+      const distance50 = ema50 ? calculateEMADistance(currentPrice, ema50) : null;
+      const distance100 = ema100 ? calculateEMADistance(currentPrice, ema100) : null;
+      const distance200 = ema200 ? calculateEMADistance(currentPrice, ema200) : null;
+      
+      emaData.push({
+        symbol,
+        ema20: { value: ema20 ? ema20.toFixed(2) : 'N/A', distance: distance20 ? distance20.toFixed(2) : 'N/A' },
+        ema50: { value: ema50 ? ema50.toFixed(2) : 'N/A', distance: distance50 ? distance50.toFixed(2) : 'N/A' },
+        ema100: { value: ema100 ? ema100.toFixed(2) : 'N/A', distance: distance100 ? distance100.toFixed(2) : 'N/A' },
+        ema200: { value: ema200 ? ema200.toFixed(2) : 'N/A', distance: distance200 ? distance200.toFixed(2) : 'N/A' }
+      });
+    } catch (error) {
+      emaData.push({
+        symbol,
+        ema20: { value: 'N/A', distance: 'N/A' },
+        ema50: { value: 'N/A', distance: 'N/A' },
+        ema100: { value: 'N/A', distance: 'N/A' },
+        ema200: { value: 'N/A', distance: 'N/A' }
+      });
+      console.error(`获取${symbol} 4小时EMA数据失败:`, error);
+    }
+  }
+  
+  return emaData;
+}
+
+/**
+ * 发送技术指标分析（RSI + EMA + 恐慌指数）
+ */
+async function sendTechnicalIndicators(env) {
+  const priceData = await getCurrentPrices();
+  const fearGreedData = await getFearGreedIndex(env);
+  const rsiData = await getRSIData();
+  const emaData = await get4HourEMAData();
+  
+  const message = `${priceData}\n\n` +
+    `${fearGreedData}\n\n` +
+    `*💹 RSI 指标*\n${formatRSIData(rsiData)}\n\n` +
+    `*📈 EMA 分析*\n${formatEMAData(emaData)}`;
+  
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
+}
+
+/**
+ * 格式化RSI数据
+ */
+function formatRSIData(rsiData) {
+  let formatted = '';
+  
+  for (const symbolData of rsiData) {
+    formatted += `*${symbolData.symbol}*\n`;
+    
+    for (const timeframe of symbolData.timeframes) {
+      formatted += `${timeframe.interval}: *${timeframe.rsi7}*(7),*${timeframe.rsi14}*(14)\n`;
+    }
+    formatted += '\n';
+  }
+  
+  return formatted.trim();
+}
+
+/**
+ * 格式化EMA数据
+ */
+function formatEMAData(emaData) {
+  let formatted = '';
+  
+  for (const symbolData of emaData) {
+    formatted += `*${symbolData.symbol} 4小时EMA分析*\n`;
+    formatted += `📊 EMA20: ${symbolData.ema20.value} (${symbolData.ema20.distance}%)\n`;
+    formatted += `📊 EMA50: ${symbolData.ema50.value} (${symbolData.ema50.distance}%)\n`;
+    formatted += `📊 EMA100: ${symbolData.ema100.value} (${symbolData.ema100.distance}%)\n`;
+    formatted += `📊 EMA200: ${symbolData.ema200.value} (${symbolData.ema200.distance}%)\n\n`;
+  }
+  
+  return formatted.trim();
+}
+
+/**
+ * 每小时任务：推送技术指标和恐惧贪婪指数
+ */
+async function handleHourlyTask(env) {
+  console.log('执行每小时任务');
+  await sendTechnicalIndicators(env);
 }
