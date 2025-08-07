@@ -4,12 +4,6 @@ import { calculateCurrentRSI, calculateCurrentEMA, calculateEMADistance, calcula
 // OKX支持的交易对
 const OKX_SYMBOLS = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'];
 
-// Coinbase支持的交易对映射
-const COINBASE_SYMBOLS = {
-  'BTC-USDT': 'BTC-USD',
-  'ETH-USDT': 'ETH-USD'
-};
-
 // 支持的时间框架
 const TIMEFRAMES = {
   '15m': '15分钟',
@@ -144,9 +138,8 @@ async function getSpotPremiumIndex() {
       const contractPrice = contractData[0][3];
       
       // 获取对应的现货价格
-      const baseSymbol = symbol.replace('-USDT-SWAP', '-USDT');
-      const coinbaseSymbol = COINBASE_SYMBOLS[baseSymbol];
-      
+      const coinbaseSymbol = symbol.replace('-USDT-SWAP', '-USD');
+
       if (coinbaseSymbol) {
         const spotPrice = await getCoinbaseSpotPrice(coinbaseSymbol);
         const premium = calculateSpotPremium(spotPrice, contractPrice);
