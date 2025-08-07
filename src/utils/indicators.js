@@ -108,3 +108,17 @@ export function calculateEMADistance(price, ema) {
   // 计算百分比距离
   return ((price - ema) / ema) * 100;
 }
+
+/**
+ * 计算现货溢价指数
+ * @param {number} spotPrice - 现货价格
+ * @param {number} contractPrice - 合约价格
+ * @returns {number|null} 溢价百分比 (正值表示现货溢价)
+ */
+export function calculateSpotPremium(spotPrice, contractPrice) {
+  if (typeof spotPrice !== 'number' || typeof contractPrice !== 'number' || 
+      isNaN(spotPrice) || isNaN(contractPrice) || contractPrice <= 0) {
+    return null;
+  }
+  return ((spotPrice - contractPrice) / contractPrice) * 100;
+}

@@ -48,7 +48,7 @@ export default {
 async function sendHelpMessage(env) {
   const message = `*加密货币指标机器人命令列表:*\n\n` +
     `/start - 开启机器人推送\n` +
-    `/indicator - 手动触发技术指标分析\n`;
+    `/indicator - 手动触发技术指标分析（包含现货溢价）\n`;
   try {
     const response = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',

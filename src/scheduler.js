@@ -1,8 +1,14 @@
-import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage } from './utils/api.js';
-import { calculateCurrentRSI, calculateCurrentEMA, calculateEMADistance } from './utils/indicators.js';
+import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage, getCoinbaseSpotPrice } from './utils/api.js';
+import { calculateCurrentRSI, calculateCurrentEMA, calculateEMADistance, calculateSpotPremium } from './utils/indicators.js';
 
-// 支持的交易对
-const SYMBOLS = ['BTC-USDT', 'ETH-USDT'];
+// OKX支持的交易对
+const OKX_SYMBOLS = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'];
+
+// Coinbase支持的交易对映射
+const COINBASE_SYMBOLS = {
+  'BTC-USDT': 'BTC-USD',
+  'ETH-USDT': 'ETH-USD'
+};
 
 // 支持的时间框架
 const TIMEFRAMES = {
@@ -66,7 +72,7 @@ async function handleStartCommand(env) {
   
   const message = `*加密货币指标机器人已启动!*\n\n` +
     `你可以使用以下命令:\n` +
-    `/indicator - 获取技术指标分析\n`;
+    `/indicator - 获取技术指标分析（包含现货溢价）\n`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
 }
@@ -81,11 +87,11 @@ async function handleIndicatorCommand(env) {
 
 
 /**
- * 获取当前价格
+ * 获取当前合约价格
  */
 async function getCurrentPrices() {
   let priceData = '';
-  for (const symbol of SYMBOLS) {
+  for (const symbol of OKX_SYMBOLS) {
     try {
       const data = await getCryptoData(symbol, '1h', 1);
       const currentPrice = data[0][3];
@@ -126,12 +132,45 @@ async function getFearGreedIndex(env) {
 }
 
 /**
+ * 获取当前现货溢价指数
+ */
+async function getSpotPremiumIndex() {
+  let premiumData = '';
+  
+  for (const symbol of OKX_SYMBOLS) {
+    try {
+      // 获取合约价格
+      const contractData = await getCryptoData(symbol, '1h', 1);
+      const contractPrice = contractData[0][3];
+      
+      // 获取对应的现货价格
+      const baseSymbol = symbol.replace('-USDT-SWAP', '-USDT');
+      const coinbaseSymbol = COINBASE_SYMBOLS[baseSymbol];
+      
+      if (coinbaseSymbol) {
+        const spotPrice = await getCoinbaseSpotPrice(coinbaseSymbol);
+        const premium = calculateSpotPremium(spotPrice, contractPrice);
+        
+        if (premium !== null) {
+          const coin = baseSymbol.split('-')[0];
+          premiumData += `${coin}: *${premium.toFixed(3)}%*\n`;
+        }
+      }
+    } catch (error) {
+      console.error(`获取${symbol}现货溢价失败:`, error);
+    }
+  }
+  
+  return premiumData.trim() || '数据获取失败';
+}
+
+/**
  * 获取RSI数据
  */
 async function getRSIData() {
   let rsiData = [];
   
-  for (const symbol of SYMBOLS) {
+  for (const symbol of OKX_SYMBOLS) {
     let symbolData = { symbol, timeframes: [] };
     
     // 获取不同时间框架的数据
@@ -170,7 +209,7 @@ async function getRSIData() {
 async function get4HourEMAData() {
   let emaData = [];
   
-  for (const symbol of SYMBOLS) {
+  for (const symbol of OKX_SYMBOLS) {
     try {
       const data = await getCryptoData(symbol, '4h', 300);
       const closes = data.map(d => d[3]);
@@ -209,18 +248,20 @@ async function get4HourEMAData() {
 }
 
 /**
- * 发送技术指标分析（RSI + EMA + 恐慌指数）
+ * 发送技术指标分析（RSI + EMA + 恐慌指数 + 现货溢价）
  */
 async function sendTechnicalIndicators(env) {
   const priceData = await getCurrentPrices();
   const fearGreedData = await getFearGreedIndex(env);
   const rsiData = await getRSIData();
   const emaData = await get4HourEMAData();
+  const spotPremiumData = await getSpotPremiumIndex();
   
   const message = `${priceData}\n\n` +
     `${fearGreedData}\n\n` +
     `*💹 RSI 指标*\n${formatRSIData(rsiData)}\n\n` +
-    `*📈 EMA 分析*\n${formatEMAData(emaData)}`;
+    `*📈 EMA 分析*\n${formatEMAData(emaData)}\n\n` +
+    `*💰 现货溢价指数*\n${spotPremiumData}`;
   
   await sendTelegramMessage(env.BOT_TOKEN, env.USER_ID, message);
 }
@@ -251,10 +292,10 @@ function formatEMAData(emaData) {
   
   for (const symbolData of emaData) {
     formatted += `*${symbolData.symbol} 4小时EMA分析*\n`;
-    formatted += `📊 EMA20: ${symbolData.ema20.value} (${symbolData.ema20.distance}%)\n`;
-    formatted += `📊 EMA50: ${symbolData.ema50.value} (${symbolData.ema50.distance}%)\n`;
-    formatted += `📊 EMA100: ${symbolData.ema100.value} (${symbolData.ema100.distance}%)\n`;
-    formatted += `📊 EMA200: ${symbolData.ema200.value} (${symbolData.ema200.distance}%)\n\n`;
+    formatted += `EMA20: ${symbolData.ema20.value} (${symbolData.ema20.distance}%)\n`;
+    formatted += `EMA50: ${symbolData.ema50.value} (${symbolData.ema50.distance}%)\n`;
+    formatted += `EMA100: ${symbolData.ema100.value} (${symbolData.ema100.distance}%)\n`;
+    formatted += `EMA200: ${symbolData.ema200.value} (${symbolData.ema200.distance}%)\n\n`;
   }
   
   return formatted.trim();

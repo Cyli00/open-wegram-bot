@@ -9,19 +9,16 @@ export async function getCryptoData(symbol, interval, limit = 200) {
   try {
     // okx base url
     const baseUrl = 'https://www.okx.com';
-
-    // OKX API需要将交易对格式从BTCUSDT转换为BTC-USDT
-    const okxSymbol = symbol.replace(/(\w+)(USDT)/, '$1-$2');
     const okxInterval = interval.replace('h', 'H').replace('d', 'D');
 
     // 构建查询参数
     const params = new URLSearchParams({
-      instId: okxSymbol,
+      instId: symbol,
       bar: okxInterval,
       limit: limit
     });
-    // 获取K线指数价格
-    const kline_url = `${baseUrl}/api/v5/market/index-candles`;
+    // 获取K线数据（使用candles端点获取合约价格）
+    const kline_url = `${baseUrl}/api/v5/market/candles`;
     const response = await fetch(`${kline_url}?${params}`, {
       method: 'GET'
     });
@@ -98,6 +95,30 @@ export async function getCoinMarketCapFearGreedIndex(apiKey) {
     throw error;
   }
 }
+
+/**
+ * 获取Coinbase现货价格
+ * @param {string} symbol - 交易对 (如 BTC-USD)
+ * @returns {Promise<number>} 现货价格
+ */
+export async function getCoinbaseSpotPrice(symbol) {
+  try {
+    const response = await fetch(`https://api.coinbase.com/v2/prices/${symbol}/spot`, {
+      method: 'GET'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return parseFloat(data.data.amount);
+  } catch (error) {
+    console.error(`获取Coinbase ${symbol}现货价格失败:`, error.message);
+    throw error;
+  }
+}
+
 
 /**
  * 发送Telegram消息
