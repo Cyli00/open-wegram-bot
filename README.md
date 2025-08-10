@@ -6,6 +6,7 @@
 - **RSI 指标**: 监控 6 和 14 周期的相对强弱指数
 - **EMA 指标**: 计算 50、100、200 周期的指数移动平均线距离
 - **恐惧贪婪指数**: 获取 Alternative.me 和 CoinMarketCap 的恐惧贪婪指数并提供综合分析
+- **现货溢价指数**: 计算Coinbase现货溢价指数并提供分析
 
 ### ✈️ 定制推送
 - ⏰ **每 1 小时**: 推送价格和 EMA 距离分析,推送恐惧贪婪指数;
@@ -16,19 +17,16 @@
 - 1 小时线
 - 4 小时线
 - 8 小时线
-- 12 小时线
 - 日线
 
 ### 🤖 Slash Commands 支持
 用户可以通过以下命令手动触发功能:
 - `/start` - 开启机器人推送
-- `/rsi` - 手动触发指标RSI
-- `/ema` - 手动触发价格和EMA
-- `/fng` - 手动触发贪婪指数
+- `/indicator` - 手动触发技术指标分析
 
 ## 部署方式
 
-### 方式 1: Cloudflare Workers (推荐)
+### Cloudflare Workers (推荐)
 
 1. 确保已安装 [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/)
 
