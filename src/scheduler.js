@@ -1,49 +1,6 @@
 import { getCryptoData, getAlternativeMeFearGreedIndex, getCoinMarketCapFearGreedIndex, sendTelegramMessage, getCoinbaseSpotPrice } from './utils/api.js';
 import { calculateCurrentRSI, calculateCurrentEMA, calculateEMADistance, calculateSpotPremium } from './utils/indicators.js';
 
-// 简单的内存缓存
-const cache = new Map();
-const inFlight = new Map(); // 缓存中的在途请求去重
-const CACHE_TTL = 30000; // 缓存30秒
-
-/**
- * 获取缓存数据或执行函数（带并发去重）
- * @param {string} key - 缓存键
- * @param {Function} fn - 获取数据的函数，需返回Promise
- * @param {number} ttl - 缓存时间（毫秒）
- */
-async function getCachedData(key, fn, ttl = CACHE_TTL) {
-  const cached = cache.get(key);
-
-  if (cached && Date.now() - cached.timestamp < ttl) {
-    console.log(`使用缓存数据: ${key}`);
-    return cached.data;
-  }
-
-  // 并发去重：如果已有同 key 在请求中，直接复用
-  if (inFlight.has(key)) {
-    try {
-      const data = await inFlight.get(key);
-      return data;
-    } catch (e) {
-      // 如果在途请求失败，继续走下面的fresh请求逻辑
-    }
-  }
-
-  const p = (async () => {
-    const data = await fn();
-    cache.set(key, { data, timestamp: Date.now() });
-    return data;
-  })();
-
-  inFlight.set(key, p);
-  try {
-    return await p;
-  } finally {
-    inFlight.delete(key);
-  }
-}
-
 // OKX支持的交易对
 const OKX_SYMBOLS = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP'];
 
@@ -136,22 +93,13 @@ function withTimeout(promise, ms = 10000) {
 }
 
 /**
- * 获取并缓存原始K线数据，按 (symbol, interval, limit) 维度缓存
- */
-async function getCachedOHLC(symbol, interval, limit) {
-  const key = `ohlc_${symbol}_${interval}_${limit}`;
-  // 对原始数据可复用默认TTL
-  return getCachedData(key, () => withTimeout(getCryptoData(symbol, interval, limit), 10000));
-}
-
-/**
  * 获取当前合约价格
  */
 async function getCurrentPrices() {
   // 并行获取所有交易对的价格
   const pricePromises = OKX_SYMBOLS.map(async (symbol) => {
     try {
-      const data = await getCachedOHLC(symbol, '1h', 1);
+      const data = await withTimeout(getCryptoData(symbol, '1h', 1), 10000);
       const currentPrice = data[0][3];
       return `${symbol}: *$${currentPrice.toFixed(2)}*`;
     } catch (error) {
@@ -167,40 +115,38 @@ async function getCurrentPrices() {
  * 获取恐慌指数
  */
 async function getFearGreedIndex(env) {
-  return getCachedData('fear_greed_index', async () => {
-    try {
-      const tasks = [withTimeout(getAlternativeMeFearGreedIndex(), 10000)];
-      const hasCMC = Boolean(env.COINMARKETCAP_API_KEY);
-      if (hasCMC) {
-        tasks.push(withTimeout(getCoinMarketCapFearGreedIndex(env.COINMARKETCAP_API_KEY), 10000));
-      }
-
-      const results = await Promise.allSettled(tasks);
-
-      const altRes = results[0];
-      let fearGreedData = '😨 *恐惧贪婪指数*';
-      if (altRes.status === 'fulfilled') {
-        const altMeIndex = altRes.value.data[0];
-        fearGreedData += `\n*Alternative.me*: ${altMeIndex.value} (${altMeIndex.value_classification})`;
-      } else {
-        fearGreedData += `\n*Alternative.me*: N/A`;
-      }
-
-      if (hasCMC) {
-        const cmcRes = results[1];
-        if (cmcRes && cmcRes.status === 'fulfilled') {
-          const cmcIndex = cmcRes.value.data;
-          fearGreedData += `\n*CoinMarketCap*: ${cmcIndex.value} (${cmcIndex.value_classification})`;
-        } else {
-          console.error('获取CoinMarketCap恐惧贪婪指数失败');
-        }
-      }
-
-      return fearGreedData;
-    } catch (error) {
-      return '😨 *恐惧贪婪指数*\n  数据获取失败';
+  try {
+    const tasks = [withTimeout(getAlternativeMeFearGreedIndex(), 10000)];
+    const hasCMC = Boolean(env.COINMARKETCAP_API_KEY);
+    if (hasCMC) {
+      tasks.push(withTimeout(getCoinMarketCapFearGreedIndex(env.COINMARKETCAP_API_KEY), 10000));
     }
-  }, 300000); // 恐惧贪婪指数缓存5分钟
+
+    const results = await Promise.allSettled(tasks);
+
+    const altRes = results[0];
+    let fearGreedData = '😨 *恐惧贪婪指数*';
+    if (altRes.status === 'fulfilled') {
+      const altMeIndex = altRes.value.data[0];
+      fearGreedData += `\n*Alternative.me*: ${altMeIndex.value} (${altMeIndex.value_classification})`;
+    } else {
+      fearGreedData += `\n*Alternative.me*: N/A`;
+    }
+
+    if (hasCMC) {
+      const cmcRes = results[1];
+      if (cmcRes && cmcRes.status === 'fulfilled') {
+        const cmcIndex = cmcRes.value.data;
+        fearGreedData += `\n*CoinMarketCap*: ${cmcIndex.value} (${cmcIndex.value_classification})`;
+      } else {
+        console.error('获取CoinMarketCap恐惧贪婪指数失败');
+      }
+    }
+
+    return fearGreedData;
+  } catch (error) {
+    return '😨 *恐惧贪婪指数*\n  数据获取失败';
+  }
 }
 
 /**
@@ -215,7 +161,7 @@ async function getSpotPremiumIndex() {
       const coin = symbol.split('-')[0];
       
       const [contractData, spotPrice] = await Promise.all([
-        getCachedOHLC(symbol, '1h', 1),
+        withTimeout(getCryptoData(symbol, '1h', 1), 10000),
         withTimeout(getCoinbaseSpotPrice(coinbaseSymbol), 10000)
       ]);
       
@@ -245,31 +191,27 @@ async function getRSIData() {
   const rsiPromises = OKX_SYMBOLS.map(async (symbol) => {
     // 并行获取该交易对的所有时间框架数据
     const timeframePromises = Object.entries(TIMEFRAMES).map(async ([interval, label]) => {
-      const cacheKey = `rsi_${symbol}_${interval}`;
-      
-      return getCachedData(cacheKey, async () => {
-        try {
-          const data = await getCachedOHLC(symbol, interval, 200);
-          const closes = data.map(d => d[3]);
-          
-          // 计算RSI
-          const rsi7 = calculateCurrentRSI(closes, 7);
-          const rsi14 = calculateCurrentRSI(closes, 14);
-          
-          return {
-            interval: label,
-            rsi7: rsi7 ? rsi7.toFixed(2) : 'N/A',
-            rsi14: rsi14 ? rsi14.toFixed(2) : 'N/A'
-          };
-        } catch (error) {
-          console.error(`获取${symbol} ${interval}RSI数据失败:`, error);
-          return {
-            interval: label,
-            rsi7: 'N/A',
-            rsi14: 'N/A'
-          };
-        }
-      });
+      try {
+        const data = await withTimeout(getCryptoData(symbol, interval, 200), 10000);
+        const closes = data.map(d => d[3]);
+        
+        // 计算RSI
+        const rsi7 = calculateCurrentRSI(closes, 7);
+        const rsi14 = calculateCurrentRSI(closes, 14);
+        
+        return {
+          interval: label,
+          rsi7: rsi7 ? rsi7.toFixed(2) : 'N/A',
+          rsi14: rsi14 ? rsi14.toFixed(2) : 'N/A'
+        };
+      } catch (error) {
+        console.error(`获取${symbol} ${interval}RSI数据失败:`, error);
+        return {
+          interval: label,
+          rsi7: 'N/A',
+          rsi14: 'N/A'
+        };
+      }
     });
     
     const timeframes = await Promise.all(timeframePromises);
@@ -285,42 +227,38 @@ async function getRSIData() {
 async function get4HourEMAData() {
   // 并行处理所有交易对
   const emaPromises = OKX_SYMBOLS.map(async (symbol) => {
-    const cacheKey = `ema_${symbol}_4h`;
-    
-    return getCachedData(cacheKey, async () => {
-      try {
-        const data = await getCachedOHLC(symbol, '4h', 300);
-        const closes = data.map(d => d[3]);
-        const currentPrice = closes[closes.length - 1];
-        
-        const ema20 = calculateCurrentEMA(closes, 20);
-        const ema50 = calculateCurrentEMA(closes, 50);
-        const ema100 = calculateCurrentEMA(closes, 100);
-        const ema200 = calculateCurrentEMA(closes, 200);
-        
-        const distance20 = ema20 ? calculateEMADistance(currentPrice, ema20) : null;
-        const distance50 = ema50 ? calculateEMADistance(currentPrice, ema50) : null;
-        const distance100 = ema100 ? calculateEMADistance(currentPrice, ema100) : null;
-        const distance200 = ema200 ? calculateEMADistance(currentPrice, ema200) : null;
-        
-        return {
-          symbol,
-          ema20: { value: ema20 ? ema20.toFixed(2) : 'N/A', distance: distance20 ? distance20.toFixed(2) : 'N/A' },
-          ema50: { value: ema50 ? ema50.toFixed(2) : 'N/A', distance: distance50 ? distance50.toFixed(2) : 'N/A' },
-          ema100: { value: ema100 ? ema100.toFixed(2) : 'N/A', distance: distance100 ? distance100.toFixed(2) : 'N/A' },
-          ema200: { value: ema200 ? ema200.toFixed(2) : 'N/A', distance: distance200 ? distance200.toFixed(2) : 'N/A' }
-        };
-      } catch (error) {
-        console.error(`获取${symbol} 4小时EMA数据失败:`, error);
-        return {
-          symbol,
-          ema20: { value: 'N/A', distance: 'N/A' },
-          ema50: { value: 'N/A', distance: 'N/A' },
-          ema100: { value: 'N/A', distance: 'N/A' },
-          ema200: { value: 'N/A', distance: 'N/A' }
-        };
-      }
-    }, 60000); // EMA数据缓存60秒
+    try {
+      const data = await withTimeout(getCryptoData(symbol, '4h', 300), 10000);
+      const closes = data.map(d => d[3]);
+      const currentPrice = closes[closes.length - 1];
+      
+      const ema20 = calculateCurrentEMA(closes, 20);
+      const ema50 = calculateCurrentEMA(closes, 50);
+      const ema100 = calculateCurrentEMA(closes, 100);
+      const ema200 = calculateCurrentEMA(closes, 200);
+      
+      const distance20 = ema20 ? calculateEMADistance(currentPrice, ema20) : null;
+      const distance50 = ema50 ? calculateEMADistance(currentPrice, ema50) : null;
+      const distance100 = ema100 ? calculateEMADistance(currentPrice, ema100) : null;
+      const distance200 = ema200 ? calculateEMADistance(currentPrice, ema200) : null;
+      
+      return {
+        symbol,
+        ema20: { value: ema20 ? ema20.toFixed(2) : 'N/A', distance: distance20 ? distance20.toFixed(2) : 'N/A' },
+        ema50: { value: ema50 ? ema50.toFixed(2) : 'N/A', distance: distance50 ? distance50.toFixed(2) : 'N/A' },
+        ema100: { value: ema100 ? ema100.toFixed(2) : 'N/A', distance: distance100 ? distance100.toFixed(2) : 'N/A' },
+        ema200: { value: ema200 ? ema200.toFixed(2) : 'N/A', distance: distance200 ? distance200.toFixed(2) : 'N/A' }
+      };
+    } catch (error) {
+      console.error(`获取${symbol} 4小时EMA数据失败:`, error);
+      return {
+        symbol,
+        ema20: { value: 'N/A', distance: 'N/A' },
+        ema50: { value: 'N/A', distance: 'N/A' },
+        ema100: { value: 'N/A', distance: 'N/A' },
+        ema200: { value: 'N/A', distance: 'N/A' }
+      };
+    }
   });
   
   return Promise.all(emaPromises);
